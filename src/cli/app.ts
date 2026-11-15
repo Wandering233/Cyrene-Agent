@@ -20,6 +20,7 @@ import {
   type HandlerCtx,
 } from "./commands/handlers.js";
 import { cmdRun } from "./commands/run.js";
+import { cmdControl } from "./commands/control.js";
 
 declare const __CYRENE_VERSION__: string;
 
@@ -49,6 +50,8 @@ export async function main(argv: readonly string[], versionOverride?: string): P
       return cmdHelp();
     case "run":
       return cmdRun();
+    case "control":
+      return cmdControl(cmd.command);
     case "placeholder":
       return cmdPlaceholder(cmd.name);
     case "unknown":

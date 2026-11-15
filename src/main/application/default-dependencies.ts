@@ -139,6 +139,7 @@ import { installSingleInstanceGuard } from "../single-instance";
 import { migrateLegacyUserData } from "../user-data-migration";
 import { createWindowManager } from "../windows/window-manager";
 import { createTray } from "../tray";
+import { startControlServer } from "../control/control-server";
 import { createSplashWindow } from "../startup/create-splash-window";
 import { revealStartupWindows } from "../startup/startup-window-reveal";
 import { bootstrapMusicService } from "../music/bootstrap";
@@ -380,6 +381,13 @@ export function createDefaultApplicationDependencies(): ApplicationDependencies 
         togglePetWindow: input.togglePetWindow,
         requestActivation: input.requestActivation,
         quit: () => app.quit(),
+      }),
+      quitApplication: () => app.quit(),
+      startControlServer: (input) => startControlServer({
+        "show-chat": () => input.requestActivation({ kind: "chat" }),
+        "show-settings": () => input.requestActivation({ kind: "settings" }),
+        "toggle-pet": () => input.togglePetWindow(),
+        quit: () => input.quit(),
       }),
       flushTokenUsage,
     }),

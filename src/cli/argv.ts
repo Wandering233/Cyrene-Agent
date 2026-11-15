@@ -11,6 +11,7 @@ export type Command =
   | { kind: "version" }
   | { kind: "help" }
   | { kind: "run" }
+  | { kind: "control"; command: string }
   | { kind: "placeholder"; name: "doctor" | "init" | "update" }
   | { kind: "unknown"; name: string };
 
@@ -42,6 +43,12 @@ export function parseArgv(argv: readonly string[]): Command {
     const leftover = argv.find((a) => a.startsWith("-"));
     if (leftover !== undefined) return { kind: "unknown", name: leftover };
     return { kind: "default" };
+  }
+
+  if (sub === "control") {
+    const index = argv.indexOf(sub);
+    const command = argv.slice(index + 1).find((a) => !a.startsWith("-"));
+    return { kind: "control", command: command ?? "" };
   }
 
   const known = SUBCOMMANDS.get(sub);

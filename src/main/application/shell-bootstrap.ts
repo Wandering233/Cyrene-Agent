@@ -42,6 +42,14 @@ export interface ShellDependencies {
     requestActivation(request: WindowActivationRequest): void;
     togglePetWindow(): void;
   }): Tray;
+  /** Quit the application from the local control socket. */
+  quitApplication?(): void;
+  /** Optional local control socket; used as the no-tray fallback. */
+  startControlServer?(input: {
+    requestActivation(request: WindowActivationRequest): void;
+    togglePetWindow(): void;
+    quit(): void;
+  }): { close(): void } | null;
   flushTokenUsage(): void;
   /** banner + 启动日志；测试可覆盖避免控制台噪声。 */
   writeStartupLog(): void;
@@ -115,6 +123,11 @@ export async function startShell(deps: ShellDependencies): Promise<ShellResult> 
     requestActivation: (request) => activation.request(request),
     togglePetWindow: () => windowManager.togglePetWindow(),
   });
+  const controlServer = deps.startControlServer?.({
+    requestActivation: (request) => activation.request(request),
+    togglePetWindow: () => windowManager.togglePetWindow(),
+    quit: () => deps.quitApplication?.(),
+  }) ?? null;
 
   // 9. 注册已创建资源的退出清理（固定阶段）
   shutdown.register({
@@ -134,6 +147,13 @@ export async function startShell(deps: ShellDependencies): Promise<ShellResult> 
       if (!tray.isDestroyed()) tray.destroy();
     },
   });
+  if (controlServer) {
+    shutdown.register({
+      id: "control-server",
+      phase: "stopLocalResources",
+      dispose: async () => { controlServer.close(); },
+    });
+  }
   shutdown.register({
     id: "shell-ipc",
     phase: "stopLocalResources",

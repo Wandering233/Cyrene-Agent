@@ -26,6 +26,11 @@ describe("parseArgv", () => {
     expect(parseArgv(["run"])).toEqual({ kind: "run" });
   });
 
+  it("parses control commands", () => {
+    expect(parseArgv(["control", "show-chat"])).toEqual({ kind: "control", command: "show-chat" });
+    expect(parseArgv(["control"])).toEqual({ kind: "control", command: "" });
+  });
+
   it("maps --help and -h to help, regardless of position", () => {
     expect(parseArgv(["--help"])).toEqual({ kind: "help" });
     expect(parseArgv(["-h"])).toEqual({ kind: "help" });

@@ -82,7 +82,7 @@
 | GS-04 | ❌ | per-DE 兜底 | 无 | Hyprland dynamic bind、KDE、Sway、GNOME | P1 |
 | GS-05 | ❌ | 快捷键设置 UI/持久化 | 只有截图 accelerator 注册 | 录制快捷键、冲突检测、保存 | P1 |
 | TRAY-01 | ✅ | StatusNotifier 宿主检测 | 新增 `tray/tray-host.ts`，启动用 gdbus `NameHasOwner` 探测；单测覆盖；本机 quickshell 返回 true | 无宿主实机验证降级日志 | P0 |
-| TRAY-02 | 🟡 | 无托盘降级入口 | 检测到无 watcher 时输出明确警告；再次启动应用会经 single-instance 打开聊天窗口 | 独立控制条/快捷键/CLI socket | P0 |
+| TRAY-02 | ✅ | 无托盘降级入口 | 新增 `cyrene control` CLI + `$XDG_RUNTIME_DIR/cyrene-control.sock`（0600）；实测 `control show-chat` 打开聊天窗 | 已验收 | P0 |
 | TRAY-03 | ❌ | GNOME AppIndicator 提示 | 无 | 检测扩展/提示安装 | P1 |
 | FOCUS-01 | ❌ | `xdg-activation` 支持 | 只有应用内 activation broker | 获取/使用 activation token | P0 |
 | FOCUS-02 | ❌ | 后台主动弹窗焦点 | 依赖 `show()/focus()` | 通知/激活 token；不抢焦点策略 | P0 |
@@ -146,7 +146,7 @@
 **一轮完成全部 60+ 项不现实**（涉及 GNOME/Mutter、HiDPI、多屏、截图、portal、沙箱、打包发布和多个发行版实机）。建议按以下批次推进：
 
 ### Batch 1：核心可用性（约 2–3 周）
-OVL-01/02/03（GNOME fallback）、OVL-05（分数缩放实机）、OVL-07（热插拔/多屏互拖）、OVL-27（KDE/Sway/GNOME E2E）、SHOT-01/02/03/04/07（portal 截图）、TRAY-01/02。
+OVL-01/02/03（GNOME fallback）、OVL-05（分数缩放实机）、OVL-07（热插拔/多屏互拖）、OVL-27（KDE/Sway/GNOME E2E）、SHOT-01/02/03/04/07（portal 截图）。
 
 ### Batch 2：产品化（约 2–3 周）
 GS-01/02/03、FOCUS-01/02、TOAST-01/02/03、UPD-01/02/03、SBX-01/02/04、OVL-11/12、QA-01/02/07。

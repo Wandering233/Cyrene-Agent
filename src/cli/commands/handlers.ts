@@ -42,6 +42,7 @@ Commands:
   about     Print banner plus project metadata
   version   Print version only
   run       Launch the Electron desktop app [dev only]
+  control   Send a local control command (show-chat/show-settings/toggle-pet/quit)
   doctor    Diagnose the local environment (planned)
   init      Initialize a workspace (planned)
   update    Self-update (planned)
