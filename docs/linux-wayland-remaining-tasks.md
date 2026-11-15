@@ -3,7 +3,7 @@
 > 基线：`e42a45b4 feat(跨平台): 增加 Linux Wayland 原生桌宠 overlay`
 > 环境：Arch Linux + Hyprland 0.57.1 + Wayland，Electron 44.7.2
 > 说明：本文是**全量任务清单与逐项核对结果**；已完成项会随实现更新。
-> 最近更新：XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）。
+> 最近更新：XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
 
 ## 状态图例
 
@@ -37,7 +37,7 @@
 | OVL-04 | ✅ | HiDPI buffer scale | 初始化 scale、物理 buffer、`set_buffer_scale`、input region/指针换算；`CYRENE_OVERLAY_SCALE=2` 实测 800x1000 buffer 显示在 400x500 layer，角落穿透/中心点击正确 | 真实 2x 输出待 OVL-27 | P0 |
 | OVL-05 | 🟡 | 分数缩放 1.25/1.5 | 使用 `ceil(scale)` 整数超采样（1.25/1.5→2x），逻辑坐标不变 | 真实 1.25/1.5 输出实机；非整数 buffer_scale 替代方案 | P0 |
 | OVL-06 | ✅ | 按 `init.output` 选择输出 | 已实现名称匹配 + layer surface 重建；实测 `switched overlay to output HDMI-A-1` | 多屏互切归 OVL-07/27 | P0 |
-| OVL-07 | ❌ | 多屏热插拔/位置持久化 | 位置是全局 x/y，未绑定输出 | 输出移除/重连/位置恢复 | P0 |
+| OVL-07 | 🟡 | 多屏热插拔/位置持久化 | 新增 `petWindowOutput`/`petWindowPositions`；实机拖拽写入 HDMI-A-1 位置，重启恢复到 947,507 | 输出移除/重连热插拔；多屏互拖 | P0 |
 | OVL-08 | ❌ | 跨输出拖拽 | 拖拽只改 margin，不换输出 | 跨屏 surface 迁移/坐标重算 | P1 |
 | OVL-09 | 🟡 | `petAlwaysOnTop=false` 语义 | 已能切 `TOP`/`OVERLAY`，但关闭仍是 `TOP` | 普通层级模式或明确文档化限制 | P1 |
 | OVL-10 | 🟡 | 全屏/锁屏/通知 z-order | 只验证普通窗口 | 全屏游戏、锁屏、通知中心、面板遮挡 | P1 |
@@ -146,7 +146,7 @@
 **一轮完成全部 60+ 项不现实**（涉及 GNOME/Mutter、HiDPI、多屏、截图、portal、沙箱、打包发布和多个发行版实机）。建议按以下批次推进：
 
 ### Batch 1：核心可用性（约 2–3 周）
-OVL-01/02/03（GNOME fallback）、OVL-04/05（HiDPI）、OVL-07（多屏热插拔）、OVL-27（KDE/Sway/GNOME E2E）、SHOT-01/02/03/04/07（portal 截图）、TRAY-01/02。
+OVL-01/02/03（GNOME fallback）、OVL-05（分数缩放实机）、OVL-07（热插拔/多屏互拖）、OVL-27（KDE/Sway/GNOME E2E）、SHOT-01/02/03/04/07（portal 截图）、TRAY-01/02。
 
 ### Batch 2：产品化（约 2–3 周）
 GS-01/02/03、FOCUS-01/02、TOAST-01/02/03、UPD-01/02/03、SBX-01/02/04、OVL-11/12、QA-01/02/07。

@@ -56,6 +56,10 @@ export interface GeneralSettings {
   petWindowX?: number;
   /** 桌宠窗口 Y 坐标，未保存时为 undefined */
   petWindowY?: number;
+  /** 桌宠最近所在输出名（如 HDMI-A-1），用于多屏位置恢复 */
+  petWindowOutput?: string;
+  /** 按输出保存的桌宠位置；输出移除后仍保留，重连可恢复 */
+  petWindowPositions?: Record<string, { x: number; y: number }>;
   disableGpuElectron?: boolean;
   /** 提醒中心音效总开关：关闭后所有 toast 静音，弹窗行为不受影响。 */
   toastSoundEnabled: boolean;

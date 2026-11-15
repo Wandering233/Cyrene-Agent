@@ -140,6 +140,10 @@ export class PetOverlayController {
     return { x: this.x, y: this.y };
   }
 
+  getOutput(): string | undefined {
+    return this.options.output;
+  }
+
   isVisible(): boolean {
     return this.visible;
   }

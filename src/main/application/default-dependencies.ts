@@ -357,7 +357,17 @@ export function createDefaultApplicationDependencies(): ApplicationDependencies 
         getCurrentAppIconPath,
         isDev,
         loadPetWindowSettingsSlice: loadGeneralSettings,
-        persistPetWindowPosition: ({ x, y }) => saveGeneralSettings({ petWindowX: x, petWindowY: y }),
+        persistPetWindowPosition: ({ x, y }, output) => {
+          const before = loadGeneralSettings();
+          const positions = { ...(before.petWindowPositions ?? {}) };
+          if (output) positions[output] = { x, y };
+          saveGeneralSettings({
+            petWindowX: x,
+            petWindowY: y,
+            petWindowOutput: output,
+            petWindowPositions: positions,
+          });
+        },
       }),
       createChatShell: (windowManager) => windowManager.createReactChatWindowShell(),
       registerProtocolHandlers,

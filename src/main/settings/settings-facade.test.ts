@@ -242,3 +242,39 @@ describe("general browser viewport mode setting", () => {
     expect(normalizeGeneralSettings({ browserViewportMode: "custom" }).browserViewportMode).toBe("custom");
   });
 });
+
+describe("per-output pet window positions", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    electronMock.userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "cyrene-pet-output-settings-"));
+  });
+
+  it("normalizes output names and rounds coordinates", () => {
+    const settings = normalizeGeneralSettings({
+      petWindowOutput: " HDMI-A-1 ",
+      petWindowPositions: {
+        "HDMI-A-1": { x: 10.4, y: 20.6 },
+        "": { x: 1, y: 2 },
+        broken: { x: "nope", y: 3 },
+      },
+    } as never);
+
+    expect(settings.petWindowOutput).toBe("HDMI-A-1");
+    expect(settings.petWindowPositions).toEqual({ "HDMI-A-1": { x: 10, y: 21 } });
+  });
+
+  it("round trips output positions through the settings file", async () => {
+    const first = await import("./settings-facade");
+    first.saveGeneralSettings({
+      petWindowOutput: "HDMI-A-1",
+      petWindowPositions: { "HDMI-A-1": { x: 300, y: 200 } },
+    });
+
+    vi.resetModules();
+    const reloaded = await import("./settings-facade");
+    expect(reloaded.loadGeneralSettings().petWindowOutput).toBe("HDMI-A-1");
+    expect(reloaded.loadGeneralSettings().petWindowPositions).toEqual({
+      "HDMI-A-1": { x: 300, y: 200 },
+    });
+  });
+});

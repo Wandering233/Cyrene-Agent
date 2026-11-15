@@ -7,6 +7,12 @@ import { createPetOverlayWindow, shouldUsePetOverlay } from "../pet-overlay";
 export const PET_WINDOW_BASE_WIDTH = 400;
 export const PET_WINDOW_BASE_HEIGHT = 500;
 
+function normalizeOutputLabel(label: string | undefined): string | undefined {
+  const trimmed = typeof label === "string" ? label.trim() : "";
+  if (!trimmed) return undefined;
+  return trimmed.replace(/^\((.*)\)$/, "$1");
+}
+
 /**
  * 仅创建阶段需要的 GeneralSettings 切片。
  * 避免反向依赖 index.ts 中的完整 loadGeneralSettings。
@@ -14,6 +20,8 @@ export const PET_WINDOW_BASE_HEIGHT = 500;
 export interface PetWindowSettingsSlice {
   petWindowX?: number;
   petWindowY?: number;
+  petWindowOutput?: string;
+  petWindowPositions?: Record<string, { x: number; y: number }>;
   /** 桌宠缩放因子；离屏判定需按缩放后的实际窗口尺寸计算。 */
   petZoom?: number;
   /** 桌宠窗口置顶设置；窗口重建时需重新应用。 */
@@ -53,10 +61,22 @@ export function createPetWindow(
   let restoreX: number | undefined;
   let restoreY: number | undefined;
 
-  if (settings.petWindowX !== undefined && settings.petWindowY !== undefined) {
+  const savedOutput = settings.petWindowOutput;
+  const savedByOutput = savedOutput
+    ? settings.petWindowPositions?.[savedOutput]
+    : undefined;
+  const savedOutputPresent = savedOutput
+    ? screen.getAllDisplays().some(
+      (display) => normalizeOutputLabel(display.label) === savedOutput,
+    )
+    : false;
+  const savedX = savedOutputPresent ? savedByOutput?.x : settings.petWindowX;
+  const savedY = savedOutputPresent ? savedByOutput?.y : settings.petWindowY;
+
+  if (savedX !== undefined && savedY !== undefined) {
     const targetBounds = {
-      x: settings.petWindowX,
-      y: settings.petWindowY,
+      x: savedX,
+      y: savedY,
       width: petWidth,
       height: petHeight,
     };
@@ -72,8 +92,8 @@ export function createPetWindow(
       Math.max(targetBounds.y, wa.y);
 
     if (interW >= petWidth / 3 && interH >= petHeight / 3) {
-      restoreX = settings.petWindowX;
-      restoreY = settings.petWindowY;
+      restoreX = savedX;
+      restoreY = savedY;
     } else {
       console.log(
         "[Cyrene] 桌宠保存位置已离屏（仅 " +
@@ -97,12 +117,7 @@ export function createPetWindow(
   });
   // Electron's Wayland display label is often "(HDMI-A-1)"; layer-shell
   // expects the bare wl_output name.
-  const rawDisplayLabel = typeof targetDisplay.label === "string"
-    ? targetDisplay.label.trim()
-    : "";
-  const outputLabel = rawDisplayLabel
-    ? rawDisplayLabel.replace(/^\((.*)\)$/, "$1")
-    : undefined;
+  const outputLabel = normalizeOutputLabel(targetDisplay.label);
   const requestedScale = Number(process.env.CYRENE_OVERLAY_SCALE);
   const displayScale = Number(targetDisplay.scaleFactor);
   const overlayScale = Math.max(

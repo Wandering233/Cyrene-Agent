@@ -151,6 +151,20 @@ function notifyGeneralSettingsChanged(before: GeneralSettings, after: GeneralSet
   }
 }
 
+function normalizePetWindowPositions(
+  input: unknown,
+): Record<string, { x: number; y: number }> | undefined {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return undefined;
+  const result: Record<string, { x: number; y: number }> = {};
+  for (const [output, value] of Object.entries(input as Record<string, unknown>)) {
+    if (!output.trim() || !value || typeof value !== "object" || Array.isArray(value)) continue;
+    const { x, y } = value as { x?: unknown; y?: unknown };
+    if (typeof x !== "number" || !isFinite(x) || typeof y !== "number" || !isFinite(y)) continue;
+    result[output.trim()] = { x: Math.round(x), y: Math.round(y) };
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
 export function normalizeGeneralSettings(
   input: Partial<GeneralSettings> | null | undefined,
 ): GeneralSettings {
@@ -232,6 +246,10 @@ export function normalizeGeneralSettings(
     petWindowY: typeof input?.petWindowY === "number" && isFinite(input.petWindowY)
       ? Math.round(input.petWindowY)
       : undefined,
+    petWindowOutput: typeof input?.petWindowOutput === "string" && input.petWindowOutput.trim()
+      ? input.petWindowOutput.trim()
+      : undefined,
+    petWindowPositions: normalizePetWindowPositions(input?.petWindowPositions),
     disableGpuElectron: input?.disableGpuElectron,
     toastSoundEnabled: input?.toastSoundEnabled === undefined
       ? DEFAULT_GENERAL_SETTINGS.toastSoundEnabled

@@ -24,7 +24,7 @@ export interface WindowManagerOptions {
   getCurrentAppIconPath: () => string;
   isDev: boolean;
   loadPetWindowSettingsSlice: () => PetWindowSettingsSlice;
-  persistPetWindowPosition: (position: { x: number; y: number }) => void;
+  persistPetWindowPosition: (position: { x: number; y: number }, output?: string) => void;
 }
 
 export interface WindowManager {
@@ -188,6 +188,9 @@ export function createWindowManager(options: WindowManagerOptions): WindowManage
           const [x, y] = win.getPosition();
           return { x, y };
         })();
+        if (overlay) {
+          options.persistPetWindowPosition(position, overlay.getOutput());
+        }
         for (const handler of movedHandlers) {
           try { handler(position); } catch (err) { console.error("[WindowManager] moved handler failed:", err); }
         }
