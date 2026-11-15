@@ -722,7 +722,11 @@ impl Overlay {
         if self.output.as_ref() == Some(&output) {
             return;
         }
+        self.set_output(output);
+        info!("switched overlay to output {name}");
+    }
 
+    fn set_output(&mut self, output: wl_output::WlOutput) {
         let surface = self.compositor.create_surface(&self.qh);
         let layer = self.layer_shell.create_layer_surface(
             &self.qh,
@@ -751,7 +755,9 @@ impl Overlay {
         }
         self.region_valid = false;
         self.latest = None;
-        info!("switched overlay to output {name}");
+        self.clamp_position();
+        self.apply_margins();
+        self.send_position();
     }
 
     fn send_ready(&mut self) {
@@ -910,8 +916,23 @@ impl OutputHandler for Overlay {
         _: &QueueHandle<Self>,
         output: wl_output::WlOutput,
     ) {
-        if self.output.as_ref() == Some(&output) {
-            self.output = None;
+        if self.output.as_ref() != Some(&output) {
+            return;
+        }
+        self.output = None;
+        let replacement = self
+            .output_state
+            .outputs()
+            .find(|candidate| candidate != &output);
+        match replacement {
+            Some(next) => {
+                warn!("current output disappeared; moving overlay to the next output");
+                self.set_output(next);
+            }
+            None => {
+                warn!("current output disappeared and no output remains");
+                self.stop();
+            }
         }
     }
 }

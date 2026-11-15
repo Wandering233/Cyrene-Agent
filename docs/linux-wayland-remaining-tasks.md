@@ -34,10 +34,10 @@
 | OVL-01 | ❌ | GNOME 全屏透明 `xdg_toplevel` fallback | 宿主只 bind `zwlr_layer_shell_v1`；失败直接报 `LAYER_SHELL_UNAVAILABLE` | 新建 fullscreen xdg_toplevel 后端；Mutter 实测 | P0 |
 | OVL-02 | ❌ | GNOME 全屏父 surface + 子 surface/局部 buffer | 无 `wl_subsurface`/viewporter 代码 | 4K 不全屏缓冲；只画桌宠区域 | P0 |
 | OVL-03 | ❌ | GNOME 全屏态副作用 | 无 GNOME 检测/处理 | 顶栏、概览、全屏提示、idle inhibit 验证 | P0 |
-| OVL-04 | ✅ | HiDPI buffer scale | 初始化 scale、物理 buffer、`set_buffer_scale`、input region/指针换算；`CYRENE_OVERLAY_SCALE=2` 实测 800x1000 buffer 显示在 400x500 layer，角落穿透/中心点击正确 | 真实 2x 输出待 OVL-27 | P0 |
+| OVL-04 | ✅ | HiDPI buffer scale | 真实 HEADLESS output scale=2 实机：layer 400x500、buffer 800x1000；强制 2x 穿透/点击也验证 | 已验收 | P0 |
 | OVL-05 | 🟡 | 分数缩放 1.25/1.5 | 使用 `ceil(scale)` 整数超采样（1.25/1.5→2x），逻辑坐标不变 | 真实 1.25/1.5 输出实机；非整数 buffer_scale 替代方案 | P0 |
-| OVL-06 | ✅ | 按 `init.output` 选择输出 | 已实现名称匹配 + layer surface 重建；实测 `switched overlay to output HDMI-A-1` | 多屏互切归 OVL-07/27 | P0 |
-| OVL-07 | 🟡 | 多屏热插拔/位置持久化 | 新增 `petWindowOutput`/`petWindowPositions`；实机拖拽写入 HDMI-A-1 位置，重启恢复到 947,507 | 输出移除/重连热插拔；多屏互拖 | P0 |
+| OVL-06 | ✅ | 按 `init.output` 选择输出 | 实机在 HEADLESS-1/2（x=2238, scale=2）创建 layer，位于 [2500,100]；输出名匹配/重建有效 | 多屏互切归 OVL-07/27 | P0 |
+| OVL-07 | 🟡 | 多屏热插拔/位置持久化 | 按输出位置持久化实测通过；host 新增 output_destroyed 迁移到剩余输出逻辑 | 输出移除/重连实机复测（当前 headless 删除时序不稳定）；多屏互拖 | P0 |
 | OVL-08 | ❌ | 跨输出拖拽 | 拖拽只改 margin，不换输出 | 跨屏 surface 迁移/坐标重算 | P1 |
 | OVL-09 | 🟡 | `petAlwaysOnTop=false` 语义 | 已能切 `TOP`/`OVERLAY`，但关闭仍是 `TOP` | 普通层级模式或明确文档化限制 | P1 |
 | OVL-10 | 🟡 | 全屏/锁屏/通知 z-order | 只验证普通窗口 | 全屏游戏、锁屏、通知中心、面板遮挡 | P1 |
