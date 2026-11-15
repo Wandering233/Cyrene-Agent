@@ -1,9 +1,16 @@
+import * as os from "node:os";
+import * as path from "node:path";
+import { pathToFileURL } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import type { ScreenshotHelperClient, ScreenshotResult } from "./helper-client";
 import {
   createScreenshotService,
   validateScreenshotInsert,
 } from "./screenshot-service";
+
+/** 截图协议本身与平台无关；测试夹具跟随宿主机路径语义。 */
+const screenshotsDirectory = path.join(os.tmpdir(), "cyrene-test-screenshots");
+const capturePath = path.join(screenshotsDirectory, "capture.png");
 
 function result(overrides: Partial<ScreenshotResult> = {}): ScreenshotResult {
   return {
@@ -18,7 +25,7 @@ function result(overrides: Partial<ScreenshotResult> = {}): ScreenshotResult {
   };
 }
 
-function createHarness(registerResult = true) {
+function createHarness(registerResult = true, available = true) {
   const client = {
     processState: "stopped",
     captureState: "idle",
@@ -43,6 +50,7 @@ function createHarness(registerResult = true) {
     sendInsert,
     registerShortcut,
     unregisterShortcut,
+    isAvailable: () => available,
   });
   return {
     client,
@@ -67,10 +75,11 @@ describe("createScreenshotService", () => {
 
   it("maps the chat button to clipboard-and-file with a renderer-safe preview URL", async () => {
     const harness = createHarness();
+    const filePath = path.join(os.tmpdir(), "cyrene-chat-shots", "valid.png");
     vi.mocked(harness.client.start).mockResolvedValueOnce(
       result({
         requestId: "request-2",
-        filePath: "C:\\shots\\valid.png",
+        filePath,
         hasAnnotations: true,
       }),
     );
@@ -79,11 +88,11 @@ describe("createScreenshotService", () => {
 
     expect(harness.client.start).toHaveBeenCalledWith("clipboard-and-file", "chat-button");
     expect(harness.sendInsert).toHaveBeenCalledWith({
-      filePath: "C:\\shots\\valid.png",
+      filePath,
       width: 800,
       height: 600,
       mime: "image/png",
-      previewUrl: "file:///C:/shots/valid.png",
+      previewUrl: pathToFileURL(filePath).toString(),
       hasAnnotations: true,
     });
   });
@@ -110,6 +119,25 @@ describe("createScreenshotService", () => {
       reason: "SCREENSHOT_FILE_PATH_REQUIRED",
     });
     expect(harness.sendInsert).not.toHaveBeenCalled();
+  });
+
+  it("disables hotkeys and capture requests when the native helper is unavailable", async () => {
+    const harness = createHarness(true, false);
+
+    harness.service.init("Alt+Shift+S");
+    expect(harness.service.replaceHotkey("Alt+Shift+X")).toEqual({ ok: true, activeHotkey: null });
+    expect(harness.registerShortcut).not.toHaveBeenCalled();
+    await expect(harness.service.prewarm()).resolves.toBeUndefined();
+    expect(harness.client.ensureStarted).not.toHaveBeenCalled();
+    await expect(harness.service.startFromHotkey()).resolves.toEqual({
+      ok: false,
+      reason: "SCREENSHOT_HELPER_UNAVAILABLE",
+    });
+    await expect(harness.service.startFromChatButton()).resolves.toEqual({
+      ok: false,
+      reason: "SCREENSHOT_HELPER_UNAVAILABLE",
+    });
+    expect(harness.client.start).not.toHaveBeenCalled();
   });
 
   it("does not reject app startup when helper prewarm fails", async () => {
@@ -184,7 +212,7 @@ describe("createScreenshotService", () => {
 describe("validateScreenshotInsert", () => {
   it("accepts only a non-empty PNG inside the fixed screenshot directory", () => {
     const data = {
-      filePath: "C:\\user-data\\screenshots\\capture.png",
+      filePath: capturePath,
       width: 800,
       height: 600,
       mime: "image/png" as const,
@@ -192,13 +220,13 @@ describe("validateScreenshotInsert", () => {
     };
 
     expect(
-      validateScreenshotInsert(data, "C:\\user-data\\screenshots", () => ({
+      validateScreenshotInsert(data, screenshotsDirectory, () => ({
         isEmpty: () => false,
         getSize: () => ({ width: 800, height: 600 }),
       })),
     ).toEqual({
       ...data,
-      previewUrl: "file:///C:/user-data/screenshots/capture.png",
+      previewUrl: pathToFileURL(capturePath).toString(),
     });
   });
 
@@ -211,13 +239,13 @@ describe("validateScreenshotInsert", () => {
     expect(
       validateScreenshotInsert(
         {
-          filePath: "C:\\user-data\\other\\capture.png",
+          filePath: path.join(os.tmpdir(), "cyrene-other", "capture.png"),
           width: 800,
           height: 600,
           mime: "image/png",
           hasAnnotations: false,
         },
-        "C:\\user-data\\screenshots",
+        screenshotsDirectory,
         loadImage,
       ),
     ).toBeNull();
@@ -226,21 +254,22 @@ describe("validateScreenshotInsert", () => {
     expect(
       validateScreenshotInsert(
         {
-          filePath: "C:\\user-data\\screenshots\\capture.png",
+          filePath: capturePath,
           width: 800,
           height: 600,
           mime: "image/png",
           hasAnnotations: false,
         },
-        "C:\\user-data\\screenshots",
+        screenshotsDirectory,
         loadImage,
       ),
     ).toBeNull();
   });
 
   it("does not confuse a valid dot-prefixed file name with parent traversal", () => {
+    const dotPrefixedPath = path.join(screenshotsDirectory, "..capture.png");
     const data = {
-      filePath: "C:\\user-data\\screenshots\\..capture.png",
+      filePath: dotPrefixedPath,
       width: 20,
       height: 10,
       mime: "image/png" as const,
@@ -248,13 +277,13 @@ describe("validateScreenshotInsert", () => {
     };
 
     expect(
-      validateScreenshotInsert(data, "C:\\user-data\\screenshots", () => ({
+      validateScreenshotInsert(data, screenshotsDirectory, () => ({
         isEmpty: () => false,
         getSize: () => ({ width: 20, height: 10 }),
       })),
     ).toEqual({
       ...data,
-      previewUrl: "file:///C:/user-data/screenshots/..capture.png",
+      previewUrl: pathToFileURL(dotPrefixedPath).toString(),
     });
   });
 });

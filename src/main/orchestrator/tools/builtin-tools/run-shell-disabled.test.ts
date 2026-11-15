@@ -40,7 +40,7 @@ vi.mock("child_process", async (original) => {
     return spawnFixture(args[0], args[1] as string[], args[2] as SpawnOptions);
   } };
 });
-// 非 Windows 产品当前只探测 bash.exe；仅替换解释器发现，执行与 disabled 判定保持真实。
+// 非 Windows 使用 bash；仅替换解释器发现，执行与 disabled 判定保持真实。
 vi.mock("../../shell-runtime", async (original) => {
   const actual = await original<typeof import("../../shell-runtime")>();
   return { ...actual, resolveShellExecutable: async () => process.platform === "win32"

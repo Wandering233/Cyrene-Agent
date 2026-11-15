@@ -4,6 +4,14 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { verifyScreenshotHelper } from "../verify/screenshot-helper.mjs";
 
+if (process.platform !== "win32") {
+  console.error(
+    "[screenshot-helper] 原生截图助手当前只有 Windows 实现（Win32/DXGI/Direct2D），"
+    + "Linux/macOS 请跳过此步骤；截图热键会在运行时自动禁用。",
+  );
+  process.exit(1);
+}
+
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDirectory, "..", "..");
 const manifestPath = path.join(

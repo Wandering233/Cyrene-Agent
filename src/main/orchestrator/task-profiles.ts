@@ -60,7 +60,7 @@ function taskShellTool(tool: ToolDefinition): ToolDefinition {
   return {
     ...tool,
     description: "执行前台命令，返回退出码、标准输出和错误输出。默认在当前工作区执行；可指定权限允许的 cwd。"
-      + "shell 支持 cmd（默认）或 bash（需要已安装 Git Bash）。文件读取、搜索和修改优先使用 Read、Glob、Grep、Write、Edit。"
+      + "shell 支持 cmd 或 bash；Windows 默认 cmd，Linux/macOS 默认 bash。文件读取、搜索和修改优先使用 Read、Glob、Grep、Write、Edit。"
       + "默认两分钟无输出终止，最长三十分钟；长时间无输出时指定 timeout_ms。常驻进程交给主代理处理。",
     inputSchema: {
       ...tool.inputSchema,

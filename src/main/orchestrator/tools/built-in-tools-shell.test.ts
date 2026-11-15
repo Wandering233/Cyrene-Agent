@@ -6,12 +6,11 @@ describe.runIf(process.platform === "win32")("run_shell shell selection", () => 
     await import("./built-in-tools");
   });
 
-  it("publishes cmd and bash as explicit shell choices while keeping cmd as the default", () => {
+  it("publishes cmd and bash as explicit shell choices with a platform default", () => {
     const tool = toolRegistry.getById("run_shell");
     expect(tool?.inputSchema.properties.shell).toEqual({
       type: "string",
       enum: ["cmd", "bash"],
-      default: "cmd",
       description: expect.any(String),
     });
   });
@@ -36,6 +35,56 @@ describe.runIf(process.platform === "win32")("run_shell shell selection", () => 
       exitCode: 0,
       stdout: "cyrene-bash-ok",
       stderr: "",
+    });
+  });
+});
+
+describe.runIf(process.platform !== "win32")("run_shell shell selection (POSIX)", () => {
+  beforeAll(async () => {
+    await import("./built-in-tools");
+  });
+
+  it("defaults to bash and executes POSIX syntax", async () => {
+    const tool = toolRegistry.getById("run_shell");
+    if (!tool) throw new Error("run_shell was not registered");
+
+    const raw = await tool.execute(
+      { command: "printf '%s' \"$((20 + 22))\"" },
+      { permissionMode: "allow_all" } as never,
+    );
+    const result = JSON.parse(raw) as {
+      shell?: string;
+      exitCode: number | null;
+      stdout: string;
+      stderr: string;
+    };
+
+    expect(result).toMatchObject({
+      shell: "bash",
+      exitCode: 0,
+      stdout: "42",
+      stderr: "",
+    });
+  });
+
+  it("maps an explicit cmd request to bash on POSIX", async () => {
+    const tool = toolRegistry.getById("run_shell");
+    if (!tool) throw new Error("run_shell was not registered");
+
+    const raw = await tool.execute(
+      { shell: "cmd", command: "printf 'cyrene-posix-ok'" },
+      { permissionMode: "allow_all" } as never,
+    );
+    const result = JSON.parse(raw) as {
+      shell?: string;
+      exitCode: number | null;
+      stdout: string;
+    };
+
+    expect(result).toMatchObject({
+      shell: "bash",
+      exitCode: 0,
+      stdout: "cyrene-posix-ok",
     });
   });
 });

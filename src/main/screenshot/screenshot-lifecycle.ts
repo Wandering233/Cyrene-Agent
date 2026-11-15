@@ -90,19 +90,27 @@ export function initializeScreenshotService(
     };
   };
 
+  const resolveHelperPath = () =>
+    resolveScreenshotHelperPath({
+      isPackaged: app.isPackaged,
+      appPath: app.getAppPath(),
+      resourcesPath: process.resourcesPath,
+      envOverride: process.env.CYRENE_SCREENSHOT_HELPER_PATH,
+    });
+  const isHelperAvailable = () => {
+    try {
+      return fs.existsSync(resolveHelperPath());
+    } catch {
+      return false;
+    }
+  };
   const client = new ElectronScreenshotHelperClient({
     spawnImpl: (command, args) =>
       spawn(command, args, {
         stdio: ["pipe", "pipe", "pipe"],
         windowsHide: true,
       }),
-    resolveHelperPath: () =>
-      resolveScreenshotHelperPath({
-        isPackaged: app.isPackaged,
-        appPath: app.getAppPath(),
-        resourcesPath: process.resourcesPath,
-        envOverride: process.env.CYRENE_SCREENSHOT_HELPER_PATH,
-      }),
+    resolveHelperPath,
     screenshotDirectory,
     logger: console,
   });
@@ -112,6 +120,7 @@ export function initializeScreenshotService(
 
   const service = createScreenshotService({
     client,
+    isAvailable: isHelperAvailable,
     registerShortcut: (accelerator, callback) =>
       globalShortcut.register(accelerator, callback),
     unregisterShortcut: (accelerator) => globalShortcut.unregister(accelerator),
@@ -155,6 +164,12 @@ export function initializeScreenshotService(
     return outPath;
   });
 
+  if (!isHelperAvailable()) {
+    console.warn(
+      "[Screenshot] 原生截图助手不可用，截图热键与聊天截图入口已禁用:",
+      resolveHelperPath(),
+    );
+  }
   service.init(options.initialHotkey);
   return service;
 }

@@ -142,6 +142,15 @@ Building a distributable Windows version (automatically builds both the Electron
 pnpm run package:win:dir
 ```
 
+Linux development and packaging (synchronized adaptation branch; Windows-only capabilities degrade or disable where noted):
+
+```bash
+pnpm run package:linux:dir   # unpacked directory for quick validation
+pnpm run package:linux       # AppImage + tar.gz
+```
+
+See [Linux development and adaptation notes](./docs/linux-development.md) (Chinese) for details.
+
 ### 3. Install BGE-M3 (Recommended)
 
 Cyrene can chat normally without running a local large language model. However, installing the **BGE-M3 Embedding model** is recommended (used for semantic sticker matching, Worldbook semantic retrieval, and RAG retrieval):

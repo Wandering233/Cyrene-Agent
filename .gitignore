@@ -243,6 +243,10 @@ sticker-descriptions/
 # Cyrene agent
 .cyrene/
 dist/renderer/cyrene-welcome.png
+# 测试/本地运行时在仓库根落下的权限状态
+/agent-permission.json
+# Vite 从 src/renderer/public/fonts 复制到 dist 的构建产物
+/dist/renderer/fonts/
 
 # 本地浏览器预览样例
 /preview-demo/

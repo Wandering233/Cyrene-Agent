@@ -24,6 +24,8 @@ export interface ScreenshotServiceDeps {
   sendInsert(data: ScreenshotInsertData): void;
   registerShortcut(accelerator: string, callback: () => void): boolean;
   unregisterShortcut(accelerator: string): void;
+  /** 原生 helper 是否可用；缺省视为可用（保持既有行为）。 */
+  isAvailable?(): boolean;
 }
 
 export interface ScreenshotImageProbe {
@@ -36,15 +38,15 @@ export function validateScreenshotInsert(
   screenshotDirectory: string,
   loadImage: (filePath: string) => ScreenshotImageProbe,
 ): ScreenshotInsertData | null {
-  const root = path.win32.resolve(screenshotDirectory);
-  const filePath = path.win32.resolve(data.filePath);
-  const relative = path.win32.relative(root, filePath);
+  const root = path.resolve(screenshotDirectory);
+  const filePath = path.resolve(data.filePath);
+  const relative = path.relative(root, filePath);
   if (
     relative.length === 0
     || relative === ".."
-    || relative.startsWith(`..${path.win32.sep}`)
-    || path.win32.isAbsolute(relative)
-    || path.win32.extname(filePath).toLowerCase() !== ".png"
+    || relative.startsWith(`..${path.sep}`)
+    || path.isAbsolute(relative)
+    || path.extname(filePath).toLowerCase() !== ".png"
   ) {
     return null;
   }
@@ -74,8 +76,10 @@ function reasonFrom(error: unknown): string {
 export function createScreenshotService(deps: ScreenshotServiceDeps): ScreenshotService {
   let activeHotkey: string | null = null;
   let suspendedHotkey: string | null = null;
+  const isAvailable = () => deps.isAvailable?.() ?? true;
 
   const startFromHotkey = async (): Promise<{ ok: boolean; reason?: string }> => {
+    if (!isAvailable()) return { ok: false, reason: "SCREENSHOT_HELPER_UNAVAILABLE" };
     try {
       await deps.client.start("clipboard-only", "hotkey");
       return { ok: true };
@@ -87,6 +91,7 @@ export function createScreenshotService(deps: ScreenshotServiceDeps): Screenshot
   const startFromChatButton = async (
     sendInsert: (data: ScreenshotInsertData) => void = deps.sendInsert,
   ): Promise<{ ok: boolean; reason?: string }> => {
+    if (!isAvailable()) return { ok: false, reason: "SCREENSHOT_HELPER_UNAVAILABLE" };
     try {
       const result = await deps.client.start("clipboard-and-file", "chat-button");
       if (!result.filePath) {
@@ -119,6 +124,7 @@ export function createScreenshotService(deps: ScreenshotServiceDeps): Screenshot
   const replaceHotkey = (
     next: string,
   ): { ok: boolean; activeHotkey: string | null } => {
+    if (!isAvailable()) return { ok: true, activeHotkey: null };
     const previous = activeHotkey;
     if (previous === next) {
       return { ok: true, activeHotkey: previous };
@@ -139,9 +145,11 @@ export function createScreenshotService(deps: ScreenshotServiceDeps): Screenshot
 
   return {
     init(initialHotkey) {
+      if (!isAvailable()) return;
       replaceHotkey(initialHotkey);
     },
     async prewarm() {
+      if (!isAvailable()) return;
       try {
         await deps.client.ensureStarted();
       } catch (error) {

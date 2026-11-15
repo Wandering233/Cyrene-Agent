@@ -112,7 +112,11 @@ export function createPetWindow(
     win.loadFile(path.join(app.getAppPath(), "dist", "renderer", "index.html"));
   }
 
-  if (!ctx.isDev) {
+  // Linux 不支持 setIgnoreMouseEvents 的 forward 选项：一旦忽略鼠标事件，
+  // 渲染层就再也收不到 pointermove，无法按像素恢复交互。Linux 先保持窗口可交互，
+  // 由渲染层按模型 alpha 控制交互的完整方案留待后续平台适配。
+  const supportsMouseForwarding = process.platform === "win32" || process.platform === "darwin";
+  if (!ctx.isDev && supportsMouseForwarding) {
     win.setIgnoreMouseEvents(true, { forward: true });
   }
 

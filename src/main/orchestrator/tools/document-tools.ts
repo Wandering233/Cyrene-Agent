@@ -6,7 +6,7 @@
 // - 支持相对路径中的子目录（如 "test/report.xlsx"），自动创建父目录
 // - 文件名由模型给，强制校验扩展名（防 .exe 等危险后缀）
 // - 返回完整路径给模型，模型可以转述给用户
-// - PDF 中文字体走系统微软雅黑（Windows），找不到就降级
+// - PDF 中文字体按平台选择常见系统中文字体（Windows 微软雅黑 / Linux Noto CJK / macOS 苹方），找不到就降级
 
 import * as fs from "fs";
 import * as path from "path";
@@ -536,11 +536,27 @@ export function registerDocumentTools(): void {
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       const doc = new PDFKit.default();
       // TTC 是字体集合，必须选择具体 PostScript face；独立 TTF 不需要 face。
-      const fontCandidates = [
-        { file: "C:\\Windows\\Fonts\\msyh.ttc", face: "MicrosoftYaHei" },
-        { file: "C:\\Windows\\Fonts\\simsun.ttc", face: "SimSun" },
-        { file: "C:\\Windows\\Fonts\\simhei.ttf", face: undefined },
-      ];
+      // Windows 保持原有微软雅黑/宋体/黑体顺序；Linux 使用发行版常见的 Noto CJK / 文泉驿；
+      // macOS 使用系统自带的苹方/黑体。
+      const fontCandidates = process.platform === "win32"
+        ? [
+            { file: "C:\\Windows\\Fonts\\msyh.ttc", face: "MicrosoftYaHei" },
+            { file: "C:\\Windows\\Fonts\\simsun.ttc", face: "SimSun" },
+            { file: "C:\\Windows\\Fonts\\simhei.ttf", face: undefined },
+          ]
+        : process.platform === "linux"
+          ? [
+              { file: "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc", face: "NotoSansCJKsc-Regular" },
+              { file: "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", face: "NotoSansCJKsc-Regular" },
+              { file: "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc", face: "WenQuanYiMicroHei" },
+              { file: "/usr/share/fonts/truetype/arphic/uming.ttc", face: "ARPLUMingCN" },
+              { file: "/usr/share/fonts/adobe-source-han-sans/SourceHanSansCN-Regular.otf", face: undefined },
+            ]
+          : [
+              { file: "/System/Library/Fonts/PingFang.ttc", face: "PingFangSC-Regular" },
+              { file: "/System/Library/Fonts/STHeiti Medium.ttc", face: "HeitiSC-Medium" },
+              { file: "/System/Library/Fonts/Supplemental/Songti.ttc", face: "STSong" },
+            ];
       // 系统临时目录不要求目标父目录可创建子目录；mkdtemp 创建本次独占目录（POSIX 权限 0700）。
       // 先完成生成，字体/排版失败不能截断已有目标。
       const temporaryDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "cyrene-pdf-"));

@@ -37,16 +37,20 @@ export function resolvePlaywrightMcpCliPath(): string {
  * 运行时分发方式（不依赖用户机器的 Node.js / npx）：
  *   process.execPath（dev: electron.exe / 打包: Cyrene.exe）
  *   + ELECTRON_RUN_AS_NODE=1（Electron 以纯 Node 模式运行 cli.js）
- *   + --browser msedge（用系统自带 Edge，无需下载 Chromium）
+ *   + --browser msedge（Windows 用系统自带 Edge）/ chrome（Linux/macOS 用系统 Chrome）
  * 版本随 package.json 精确锁定（@playwright/mcp 无 ^ 漂移）。
  */
+export function playwrightBrowserChannel(platform: NodeJS.Platform = process.platform): "msedge" | "chrome" {
+  return platform === "win32" ? "msedge" : "chrome";
+}
+
 export function buildPlaywrightMcpConfig(): McpServerConfig {
   return {
     id: PLAYWRIGHT_MCP_ID,
     name: "Playwright 浏览器",
     transport: "stdio",
     command: process.execPath,
-    args: [resolvePlaywrightMcpCliPath(), "--isolated", "--headless", "--browser", "msedge"],
+    args: [resolvePlaywrightMcpCliPath(), "--isolated", "--headless", "--browser", playwrightBrowserChannel()],
     env: { ELECTRON_RUN_AS_NODE: "1" },
   };
 }

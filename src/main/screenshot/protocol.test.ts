@@ -1,5 +1,9 @@
+import * as os from "node:os";
+import * as path from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseHelperEvent, resolveCompletedFile } from "./protocol";
+
+const shotsDirectory = path.join(os.tmpdir(), "cyrene-screenshot-protocol");
 
 describe("screenshot helper protocol", () => {
   it("accepts capture-released as a non-terminal event", () => {
@@ -36,15 +40,14 @@ describe("screenshot helper protocol", () => {
   });
 
   it("rejects path traversal file names", () => {
-    expect(() => resolveCompletedFile("C:\\shots", "..\\evil.png")).toThrow("INVALID_SCREENSHOT_FILE_NAME");
+    expect(() => resolveCompletedFile(shotsDirectory, "..\\evil.png")).toThrow("INVALID_SCREENSHOT_FILE_NAME");
+    expect(() => resolveCompletedFile(shotsDirectory, "../evil.png")).toThrow("INVALID_SCREENSHOT_FILE_NAME");
   });
 
   it("accepts only UUID v4 png names", () => {
-    expect(resolveCompletedFile(
-      "C:\\shots",
-      "00000000-0000-4000-8000-000000000001.png",
-    )).toBe("C:\\shots\\00000000-0000-4000-8000-000000000001.png");
-    expect(() => resolveCompletedFile("C:\\shots", "00000000-0000-1000-8000-000000000001.png"))
+    const fileName = "00000000-0000-4000-8000-000000000001.png";
+    expect(resolveCompletedFile(shotsDirectory, fileName)).toBe(path.join(shotsDirectory, fileName));
+    expect(() => resolveCompletedFile(shotsDirectory, "00000000-0000-1000-8000-000000000001.png"))
       .toThrow("INVALID_SCREENSHOT_FILE_NAME");
   });
 });

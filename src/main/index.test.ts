@@ -20,7 +20,15 @@ vi.mock("./orchestrator/mcp-manager", () => ({
   listMcpServerConfigs: mockListConfigs,
 }));
 
-import { syncPlaywrightMcp, buildPlaywrightMcpConfig, PLAYWRIGHT_MCP_ID, syncFilesystemMcp, buildFilesystemMcpConfig, FILESYSTEM_MCP_ID } from "./sync-mcp-builtin";
+import { syncPlaywrightMcp, buildPlaywrightMcpConfig, PLAYWRIGHT_MCP_ID, syncFilesystemMcp, buildFilesystemMcpConfig, FILESYSTEM_MCP_ID, playwrightBrowserChannel } from "./sync-mcp-builtin";
+
+describe("playwrightBrowserChannel", () => {
+  it("uses the system Edge channel on Windows and Chrome elsewhere", () => {
+    expect(playwrightBrowserChannel("win32")).toBe("msedge");
+    expect(playwrightBrowserChannel("linux")).toBe("chrome");
+    expect(playwrightBrowserChannel("darwin")).toBe("chrome");
+  });
+});
 
 describe("syncPlaywrightMcp", () => {
   beforeEach(() => {
@@ -34,7 +42,7 @@ describe("syncPlaywrightMcp", () => {
     expect(mockRemove).not.toHaveBeenCalled();
   });
 
-  it("adds stdio server (execPath + ELECTRON_RUN_AS_NODE + msedge) when enabled and no stored config", async () => {
+  it("adds stdio server with the platform browser channel when enabled and no stored config", async () => {
     await syncPlaywrightMcp({ playwrightMcpEnabled: true });
     expect(mockAdd).toHaveBeenCalledTimes(1);
     expect(mockAdd).toHaveBeenCalledWith(expect.objectContaining({
@@ -46,7 +54,7 @@ describe("syncPlaywrightMcp", () => {
         "--isolated",
         "--headless",
         "--browser",
-        "msedge",
+        process.platform === "win32" ? "msedge" : "chrome",
       ]),
       env: { ELECTRON_RUN_AS_NODE: "1" },
     }));

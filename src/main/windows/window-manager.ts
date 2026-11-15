@@ -307,6 +307,9 @@ export function createWindowManager(options: WindowManagerOptions): WindowManage
     setPetWindowInteractive(interactive: boolean): void {
       const win = getUsablePetWindow();
       if (!win) return;
+      // Linux/其它平台没有鼠标事件转发：忽略后无法通过 pointermove 再恢复交互，
+      // 因此保持整窗可交互（透明边角会拦截点击，作为已知限制）。
+      if (process.platform !== "win32" && process.platform !== "darwin") return;
       win.setIgnoreMouseEvents(!interactive, { forward: true });
     },
     setPetWindowDragging(isDragging: boolean): void {

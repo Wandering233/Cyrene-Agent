@@ -20,12 +20,28 @@ vi.mock("os", async (original) => {
 });
 vi.mock("electron", () => ({ app: { getPath: () => state.root } }));
 vi.mock("../../external-content-paths", () => ({ findSkillPath: () => null }));
+// 平台字体候选：测试用 fixture 代替真实系统字体，只验证加载与失败路径。
+const WINDOWS_TTC = "C:\\Windows\\Fonts\\msyh.ttc";
+const WINDOWS_SIMSUN = "C:\\Windows\\Fonts\\simsun.ttc";
+const WINDOWS_TTF = "C:\\Windows\\Fonts\\simhei.ttf";
+const LINUX_TTC = "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc";
+const LINUX_SIMSUN = "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc";
+const LINUX_OTF = "/usr/share/fonts/adobe-source-han-sans/SourceHanSansCN-Regular.otf";
+const MACOS_TTC = "/System/Library/Fonts/PingFang.ttc";
+const MACOS_SIMSUN = "/System/Library/Fonts/STHeiti Medium.ttc";
+const MACOS_TTF = "/System/Library/Fonts/Supplemental/Songti.ttc";
+const SYSTEM_FONT_PATHS = new Set([
+  WINDOWS_TTC, WINDOWS_SIMSUN, WINDOWS_TTF,
+  LINUX_TTC, LINUX_SIMSUN, LINUX_OTF,
+  MACOS_TTC, MACOS_SIMSUN, MACOS_TTF,
+]);
+
 vi.mock("fs", async (original) => {
   const actual = await original<typeof import("fs")>();
   const mapped = (file: unknown) => {
-    if (file === "C:\\Windows\\Fonts\\msyh.ttc") return ["ttc", "fallback"].includes(state.font) ? "collection.ttc" : null;
-    if (file === "C:\\Windows\\Fonts\\simsun.ttc") return ["simsun", "fallback"].includes(state.font) ? "collection.ttc" : null;
-    if (file === "C:\\Windows\\Fonts\\simhei.ttf") return state.font === "ttf" ? "standalone.ttf" : null;
+    if (file === WINDOWS_TTC || file === LINUX_TTC || file === MACOS_TTC) return ["ttc", "fallback"].includes(state.font) ? "collection.ttc" : null;
+    if (file === WINDOWS_SIMSUN || file === LINUX_SIMSUN || file === MACOS_SIMSUN) return ["simsun", "fallback"].includes(state.font) ? "collection.ttc" : null;
+    if (file === WINDOWS_TTF || file === LINUX_OTF || file === MACOS_TTF) return state.font === "ttf" ? "standalone.ttf" : null;
     return undefined;
   };
   return { ...actual,
@@ -49,9 +65,16 @@ vi.mock("pdfkit", async (original) => {
   const actual = await original<typeof import("pdfkit")>();
   return { default: class extends actual.default {
     font(src: string, family?: string, size?: number) {
-      if ((state.failFont && src.includes("Windows")) || (state.failFirstFont && src.endsWith("msyh.ttc"))) return super.font(Buffer.from("invalid font bytes"));
-      const mapped = src.endsWith(".ttc") ? "collection.ttc" : src.endsWith(".ttf") ? "standalone.ttf" : null;
-      return super.font(mapped ? path.join(import.meta.dirname, "__fixtures__/pdf", mapped) : src, family, size);
+      const firstCandidate = process.platform === "win32"
+        ? WINDOWS_TTC
+        : process.platform === "linux" ? LINUX_TTC : MACOS_TTC;
+      if ((state.failFont && SYSTEM_FONT_PATHS.has(src)) || (state.failFirstFont && src === firstCandidate)) {
+        return super.font(Buffer.from("invalid font bytes"));
+      }
+      const mapped = src.endsWith(".ttc") ? "collection.ttc" : src.endsWith(".ttf") || src.endsWith(".otf") ? "standalone.ttf" : null;
+      // fixture collection 只有微软雅黑/宋体两个 face；Linux 测试用宋体 face 验证 CJK 映射。
+      const fixtureFamily = mapped === "collection.ttc" && process.platform !== "win32" ? "SimSun" : family;
+      return super.font(mapped ? path.join(import.meta.dirname, "__fixtures__/pdf", mapped) : src, fixtureFamily, size);
     }
     text(...args: Parameters<InstanceType<typeof actual.default>["text"]>) {
       if (state.failText) throw new Error("injected render failure");

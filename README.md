@@ -92,6 +92,15 @@ pnpm run dev
 pnpm run package:win:dir
 ```
 
+Linux 开发与打包（当前为同步适配分支，部分 Windows 专用能力会降级或禁用）：
+
+```bash
+pnpm run package:linux:dir   # 解包目录，快速验证
+pnpm run package:linux       # AppImage + tar.gz
+```
+
+详细说明见 [Linux 开发与适配说明](./docs/linux-development.md)。
+
 <details>
 <summary><b>可选步骤</b>（3. BGE-M3 嵌入模型 / 4. cyrene 命令行入口）</summary>
 

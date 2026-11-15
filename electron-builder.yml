@@ -31,10 +31,6 @@ files:
   - "!dist/virtualization-*-build.log"
   # 源码映射只供调试定位源码，正式运行不读取。
   - "!**/*.map"
-  # Windows x64 安装包只携带 Windows x64 的 ONNX Runtime 文件。
-  - "!**/onnxruntime-node/bin/napi-v3/darwin/**/*"
-  - "!**/onnxruntime-node/bin/napi-v3/linux/**/*"
-  - "!**/onnxruntime-node/bin/napi-v3/win32/arm64/**/*"
   - package.json
   - assets/**/*
   - vendor/**/*
@@ -48,12 +44,6 @@ extraFiles:
   - from: skills
     to: skills
 extraResources:
-  - from: resources/bin/cyrene-screenshot.exe
-    to: bin/cyrene-screenshot.exe
-  - from: resources/bin/mpv
-    to: bin/mpv
-  - from: resources/mingit
-    to: mingit
   - from: resources/components
     to: components
   # 第三方 skills 快照归档：首启解压到 userData/skills（见 src/main/skills/snapshot-install.ts）
@@ -61,6 +51,18 @@ extraResources:
     to: cyrene-skills
 win:
   icon: assets/tray-icon.ico
+  # Windows x64 安装包只携带 Windows x64 的运行时与 ONNX Runtime 文件。
+  files:
+    - "!**/onnxruntime-node/bin/napi-v3/darwin/**/*"
+    - "!**/onnxruntime-node/bin/napi-v3/linux/**/*"
+    - "!**/onnxruntime-node/bin/napi-v3/win32/arm64/**/*"
+  extraResources:
+    - from: resources/bin/cyrene-screenshot.exe
+      to: bin/cyrene-screenshot.exe
+    - from: resources/bin/mpv
+      to: bin/mpv
+    - from: resources/mingit
+      to: mingit
   # 保留应用支持的英文、简体中文和繁体中文界面语言。
   electronLanguages:
     - en-US
@@ -80,3 +82,24 @@ nsis:
   include: build/installer/installer.nsh
   installerSidebar: build/installer/installer-sidebar.bmp
   uninstallerSidebar: build/installer/installer-sidebar.bmp
+linux:
+  icon: assets/icon-presets/cyrene-sun.png
+  category: Utility
+  synopsis: Live2D desktop AI companion
+  description: Cyrene is a Live2D desktop AI companion built with Electron and TypeScript.
+  executableName: cyrene
+  # 让安装的 .desktop 文件名与 Electron 的 app_id / WM_CLASS 对齐（package.json desktopName）。
+  syncDesktopName: true
+  # Linux 发行版使用系统 Git 与 mpv；不打包 Windows 专用的 MinGit / mpv / 截图助手。
+  files:
+    - "!**/onnxruntime-node/bin/napi-v3/darwin/**/*"
+    - "!**/onnxruntime-node/bin/napi-v3/win32/**/*"
+  desktop:
+    entry:
+      Name: Cyrene
+      Comment: Live2D desktop AI companion
+      Categories: Utility;Development;
+      Keywords: AI;Live2D;Agent;Chat;
+  target:
+    - AppImage
+    - tar.gz

@@ -1,31 +1,41 @@
+import * as path from "node:path";
 import { describe, expect, it } from "vitest";
-import { resolveScreenshotHelperPath } from "./helper-path";
+import { resolveScreenshotHelperPath, screenshotHelperBinaryName } from "./helper-path";
+
+const binaryName = screenshotHelperBinaryName();
 
 describe("resolveScreenshotHelperPath", () => {
   it("uses the development Rust release binary", () => {
     expect(resolveScreenshotHelperPath({
       isPackaged: false,
-      appPath: "C:\\repo",
-      resourcesPath: "C:\\app\\resources",
+      appPath: "repo",
+      resourcesPath: "app/resources",
       envOverride: undefined,
-    })).toBe("C:\\repo\\native\\cyrene-screenshot\\target\\release\\cyrene-screenshot.exe");
+    })).toBe(path.join("repo", "native", "cyrene-screenshot", "target", "release", binaryName));
   });
 
   it("uses the packaged resources binary", () => {
     expect(resolveScreenshotHelperPath({
       isPackaged: true,
-      appPath: "C:\\app\\resources\\app.asar",
-      resourcesPath: "C:\\app\\resources",
+      appPath: "app/resources/app.asar",
+      resourcesPath: "app/resources",
       envOverride: undefined,
-    })).toBe("C:\\app\\resources\\bin\\cyrene-screenshot.exe");
+    })).toBe(path.join("app/resources", "bin", binaryName));
   });
 
   it("allows an explicit helper path override", () => {
+    const override = path.join("debug", binaryName);
     expect(resolveScreenshotHelperPath({
       isPackaged: true,
-      appPath: "C:\\app\\resources\\app.asar",
-      resourcesPath: "C:\\app\\resources",
-      envOverride: "D:\\debug\\cyrene-screenshot.exe",
-    })).toBe("D:\\debug\\cyrene-screenshot.exe");
+      appPath: "app/resources/app.asar",
+      resourcesPath: "app/resources",
+      envOverride: override,
+    })).toBe(override);
+  });
+
+  it("uses the platform-specific helper name for non-Windows targets", () => {
+    expect(screenshotHelperBinaryName("linux")).toBe("cyrene-screenshot");
+    expect(screenshotHelperBinaryName("darwin")).toBe("cyrene-screenshot");
+    expect(screenshotHelperBinaryName("win32")).toBe("cyrene-screenshot.exe");
   });
 });

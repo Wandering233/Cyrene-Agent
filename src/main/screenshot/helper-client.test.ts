@@ -1,9 +1,14 @@
+import * as os from "node:os";
+import * as path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   ElectronScreenshotHelperClient,
   type HelperChildProcess,
   type ScreenshotMode,
 } from "./helper-client";
+
+const helperPath = path.join(os.tmpdir(), "cyrene-helper", "cyrene-screenshot");
+const screenshotsDirectory = path.join(os.tmpdir(), "cyrene-screenshots");
 
 type Listener = (...args: any[]) => void;
 
@@ -61,8 +66,8 @@ function createHarness(): { client: ElectronScreenshotHelperClient; child: FakeC
   let sequence = 0;
   const client = new ElectronScreenshotHelperClient({
     spawnImpl: () => child,
-    resolveHelperPath: () => "C:\\helper\\cyrene-screenshot.exe",
-    screenshotDirectory: "C:\\shots",
+    resolveHelperPath: () => helperPath,
+    screenshotDirectory: screenshotsDirectory,
     parentProcessId: 42,
     now: () => 1000,
     createRequestId: () => `r${++sequence}`,
@@ -130,7 +135,9 @@ describe("ElectronScreenshotHelperClient", () => {
     expect(client.pendingRequests.get("r1")).toMatchObject({ captureReleased: true, source: "chat-button" });
 
     child.emitStdout('{"type":"completed","requestId":"r1","fileName":"00000000-0000-4000-8000-000000000001.png","width":800,"height":600,"mime":"image/png","clipboardWritten":true,"hasAnnotations":false}');
-    await expect(result).resolves.toMatchObject({ filePath: "C:\\shots\\00000000-0000-4000-8000-000000000001.png" });
+    await expect(result).resolves.toMatchObject({
+      filePath: path.join(screenshotsDirectory, "00000000-0000-4000-8000-000000000001.png"),
+    });
     expect(client.pendingRequests.size).toBe(0);
   });
 
@@ -194,8 +201,8 @@ describe("ElectronScreenshotHelperClient —— helper 先退出时的 stdin 写
     } as unknown as HelperChildProcess;
     return new ElectronScreenshotHelperClient({
       spawnImpl: () => child,
-      resolveHelperPath: () => "C:\helper\cyrene-screenshot.exe",
-      screenshotDirectory: "C:\shots",
+      resolveHelperPath: () => helperPath,
+      screenshotDirectory: screenshotsDirectory,
       logger: { debug: () => {}, warn: () => {}, error: () => {} },
     });
   }
