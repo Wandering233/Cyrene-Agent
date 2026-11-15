@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import dbus, { type Message } from "dbus-next";
+import type { Message } from "dbus-next";
+import { installDbusCompat } from "../platform/dbus-compat";
 
 export interface PortalScreenshotOptions {
   /** Ask the portal's own UI to let the user choose area/window/screen. */
@@ -53,6 +54,8 @@ export async function captureScreenshotViaPortal(
 ): Promise<PortalScreenshotResult> {
   const interactive = options.interactive ?? false;
   const timeoutMs = options.timeoutMs ?? 120_000;
+  installDbusCompat();
+  const dbus = await import("dbus-next") as unknown as typeof import("dbus-next");
   const bus = dbus.sessionBus();
 
   try {

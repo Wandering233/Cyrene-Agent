@@ -65,7 +65,7 @@
 
 | ID | 状态 | 任务 | 核对证据/现状 | 剩余工作与验收 | 优先级 |
 |---|---|---|---|---|---|
-| SHOT-01 | 🟡 | portal Screenshot v2 | 新增 `portal-screenshot.ts`（dbus-next、Response 订阅、URI 校验）；本机 Hyprland portal 非交互返回 2 | 其他 DE 实机；交互返回 0 验证 | P0 |
+| SHOT-01 | 🟡 | portal Screenshot v2 | `portal-screenshot.ts` 可在 Electron 运行；修复 dbus-next/usocket 在 Electron Node 24 的崩溃（util.isError/原生 socket） | Hyprland portal 非交互仍返回 2；其他 DE 实机/交互返回 0 | P0 |
 | SHOT-02 | 🟡 | 全屏/区域/窗口截图 | Hyprland：grim 全屏实测、slurp 选择取消路径实测；区域选择成功待人工 | 窗口截图/多屏 | P0 |
 | SHOT-03 | ✅ | 标注 overlay | 新增 Electron 标注窗口（画笔/矩形/箭头/撤销/清空/保存/取消）；自动化保存实测生成同尺寸 annotated PNG | 文字/马赛克可后续 | P0 |
 | SHOT-04 | ✅ | 剪贴板/文件保存 | 截图/标注写入 userData/screenshots；热键 ClipboardItem 写剪贴板（Electron 实测读回 image/png）；标注保存实测 | 已验收 | P0 |
