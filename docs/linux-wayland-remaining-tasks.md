@@ -81,8 +81,8 @@
 | GS-03 | ❌ | 真实按键触发验证 | `register()` true，合成按键未触发 | 真实按键/portal 事件测试 | P0 |
 | GS-04 | ❌ | per-DE 兜底 | 无 | Hyprland dynamic bind、KDE、Sway、GNOME | P1 |
 | GS-05 | ❌ | 快捷键设置 UI/持久化 | 只有截图 accelerator 注册 | 录制快捷键、冲突检测、保存 | P1 |
-| TRAY-01 | ❌ | StatusNotifier 宿主检测 | `new Tray` 直接创建，无检测 | 启动探测 `org.kde.StatusNotifierWatcher` | P0 |
-| TRAY-02 | ❌ | 无托盘降级入口 | 无 | 控制条/快捷键/CLI socket | P0 |
+| TRAY-01 | ✅ | StatusNotifier 宿主检测 | 新增 `tray/tray-host.ts`，启动用 gdbus `NameHasOwner` 探测；单测覆盖；本机 quickshell 返回 true | 无宿主实机验证降级日志 | P0 |
+| TRAY-02 | 🟡 | 无托盘降级入口 | 检测到无 watcher 时输出明确警告；再次启动应用会经 single-instance 打开聊天窗口 | 独立控制条/快捷键/CLI socket | P0 |
 | TRAY-03 | ❌ | GNOME AppIndicator 提示 | 无 | 检测扩展/提示安装 | P1 |
 | FOCUS-01 | ❌ | `xdg-activation` 支持 | 只有应用内 activation broker | 获取/使用 activation token | P0 |
 | FOCUS-02 | ❌ | 后台主动弹窗焦点 | 依赖 `show()/focus()` | 通知/激活 token；不抢焦点策略 | P0 |

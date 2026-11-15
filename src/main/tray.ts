@@ -1,4 +1,5 @@
 import { Menu, nativeImage, Tray, type MenuItemConstructorOptions } from "electron";
+import { detectStatusNotifierWatcher } from "./tray/tray-host";
 import { type WindowActivationRequest } from "./application/window-activation";
 import { getCurrentAppIconPath } from "./windows/window-state";
 
@@ -37,6 +38,12 @@ export function buildTrayMenuTemplate(deps: CreateTrayDependencies): MenuItemCon
 }
 
 export function createTray(deps: CreateTrayDependencies): Tray {
+  if (!detectStatusNotifierWatcher()) {
+    console.warn(
+      "[Tray] StatusNotifierWatcher 不存在：当前桌面没有托盘宿主，"
+      + "托盘图标不可见。可再次启动应用打开聊天窗口，或安装 waybar/quickshell/AppIndicator。",
+    );
+  }
   const icon = nativeImage.createFromPath(getCurrentAppIconPath());
   const tray = new Tray(icon);
 
