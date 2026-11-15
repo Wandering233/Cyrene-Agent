@@ -37,6 +37,7 @@ let srtWin: any = null;
 /** 实际可执行的 srt-win.exe 路径（打包后指向 app.asar.unpacked 里的真实文件） */
 let srtWinExePath: string | null = null;
 let sandboxReady = false;
+let sandboxDependencyErrors: string[] = [];
 let sandboxDisabled = false;
 let initAttempted = false;
 let sandboxSessionKey: string | null = null;
@@ -54,6 +55,10 @@ function isSrtDisabledByEnv(): boolean {
 
 function isWindows(): boolean {
   return process.platform === "win32";
+}
+
+function isLinux(): boolean {
+  return process.platform === "linux";
 }
 
 /**
@@ -166,16 +171,24 @@ function buildSandboxConfig(level: AgentFileAccessLevel, workspaceRoot: string):
       logger.warn(LogTag.Runtime, `[Sandbox] mkdir workspace root failed: ${writableRoot}`, err);
     }
   }
-  return {
+  const config: {
+    network: { allowedDomains: string[]; deniedDomains: string[] };
+    filesystem: typeof filesystem;
+    windows?: { srtWin: { path: string } };
+  } = {
     network: {
       allowedDomains: [],
       deniedDomains: [],
     },
     filesystem,
-    windows: {
-      srtWin: { path: srtWinExePath ?? srtModule.VENDORED_SRT_WIN_EXE },
-    },
   };
+  // Linux uses bubblewrap and must not carry a Windows-only runtime block.
+  if (isWindows()) {
+    config.windows = {
+      srtWin: { path: srtWinExePath ?? srtModule.VENDORED_SRT_WIN_EXE },
+    };
+  }
+  return config as SrtModule["SandboxRuntimeConfig"];
 }
 
 /**
@@ -187,7 +200,7 @@ async function initSandboxManager(level: AgentFileAccessLevel, cwd: string): Pro
   // ensureSandboxReady 已确定可信根目录；这里不能再向上推断项目扩大范围。
   const workspaceRoot = path.resolve(cwd);
   const config = buildSandboxConfig(level, workspaceRoot);
-  logger.info(LogTag.Runtime, `[Sandbox] initSandboxManager: cwd=${cwd} allowWrite=${config.filesystem.allowWrite.join(",")} srtWin=${config.windows.srtWin.path}`);
+  logger.info(LogTag.Runtime, `[Sandbox] initSandboxManager: cwd=${cwd} allowWrite=${config.filesystem.allowWrite.join(",")} srtWin=${config.windows?.srtWin.path ?? "(linux)"}`);
   await srtModule.SandboxManager.initialize(config);
   sandboxSessionKey = JSON.stringify({ level, workspaceRoot });
   logger.info(LogTag.Runtime, "[Sandbox] SandboxManager.initialize completed");
@@ -208,8 +221,8 @@ export async function initSandbox(): Promise<void> {
   if (initAttempted) return;
   initAttempted = true;
 
-  if (!isWindows()) {
-    logger.info(LogTag.Runtime, "[Sandbox] non-Windows platform, skipping");
+  if (!isWindows() && !isLinux()) {
+    logger.info(LogTag.Runtime, "[Sandbox] unsupported platform, skipping");
     return;
   }
   if (isSrtDisabledByEnv()) {
@@ -221,6 +234,25 @@ export async function initSandbox(): Promise<void> {
   try {
     // 无 default export，必须 namespace import
     srtModule = await import("@anthropic-ai/sandbox-runtime");
+
+    if (isLinux()) {
+      const deps = await srtModule.SandboxManager.checkDependenciesAsync();
+      if (deps.errors.length > 0) {
+        sandboxDependencyErrors = deps.errors;
+        logger.warn(
+          LogTag.Runtime,
+          `[Sandbox] Linux dependencies missing: ${deps.errors.join("; ")}`,
+        );
+        return;
+      }
+      sandboxDependencyErrors = [];
+      logger.info(
+        LogTag.Runtime,
+        "[Sandbox] Linux dependencies OK; will initialize bubblewrap on first sandboxed command",
+      );
+      return;
+    }
+
     srtWinExePath = toUnpackedSrtWinPath(srtModule.VENDORED_SRT_WIN_EXE as string);
     srtWin = srtModule.resolveSrtWin({ path: srtWinExePath });
 
@@ -251,7 +283,7 @@ export async function initSandbox(): Promise<void> {
  * 由后者为实际工作区建立会话授权；初始化失败仍会被严格拒绝。
  */
 export function isSandboxReady(): boolean {
-  return !!srtModule && !sandboxDisabled;
+  return !!srtModule && !sandboxDisabled && sandboxDependencyErrors.length === 0;
 }
 
 /**
@@ -265,8 +297,8 @@ export function isSandboxReady(): boolean {
  * UAC 取消不算错误（用户可能只是这次不想装），下次还会再试。
  */
 export async function ensureSandboxReady(cwd: string = process.cwd(), trustedWorkspaceRoot?: string): Promise<boolean> {
-  if (sandboxDisabled || !isWindows()) {
-    logger.info(LogTag.Runtime, `[Sandbox] ensureSandboxReady: skip (sandboxDisabled=${sandboxDisabled} isWindows=${isWindows()})`);
+  if (sandboxDisabled || (!isWindows() && !isLinux())) {
+    logger.info(LogTag.Runtime, `[Sandbox] ensureSandboxReady: skip (sandboxDisabled=${sandboxDisabled} platform=${process.platform})`);
     return false;
   }
   const level = getCurrentLevel();
@@ -278,7 +310,7 @@ export async function ensureSandboxReady(cwd: string = process.cwd(), trustedWor
     logger.info(LogTag.Runtime, "[Sandbox] ensureSandboxReady: already ready");
     return true;
   }
-  if (!srtModule || !srtWin) {
+  if (!srtModule || (isWindows() && !srtWin)) {
     logger.info(LogTag.Runtime, `[Sandbox] ensureSandboxReady: srtModule=${!!srtModule} srtWin=${!!srtWin}, cannot proceed`);
     return false;
   }
@@ -296,6 +328,27 @@ export async function ensureSandboxReady(cwd: string = process.cwd(), trustedWor
   }
 
   try {
+    if (isLinux()) {
+      const deps = await srtModule.SandboxManager.checkDependenciesAsync();
+      if (deps.errors.length > 0) {
+        sandboxDependencyErrors = deps.errors;
+        logger.warn(LogTag.Runtime, `[Sandbox] Linux dependencies missing: ${deps.errors.join("; ")}`);
+        return false;
+      }
+      sandboxDependencyErrors = [];
+      if (sandboxReady) {
+        await srtModule.SandboxManager.reset();
+        sandboxReady = false;
+        sandboxSessionKey = null;
+      }
+      await initSandboxManager(level, workspaceRoot);
+      sandboxReady = true;
+      ensureFailCount = 0;
+      lastFailedSessionKey = null;
+      logger.info(LogTag.Runtime, "[Sandbox] ready (Linux bubblewrap)");
+      return true;
+    }
+
     logger.info(LogTag.Runtime, "[Sandbox] ensureSandboxReady: checking status...");
     const status = await srtModule.checkWindowsSandboxStatusAsync({ srtWin });
     logger.info(LogTag.Runtime, `[Sandbox] ensureSandboxReady: status user.provisioned=${status.user.provisioned} wfp.state=${status.wfp.state}`);
@@ -367,9 +420,9 @@ export async function wrapWithSandbox(
   const level = getCurrentLevel();
   logger.info(LogTag.Runtime, `[Sandbox] wrapWithSandbox: command="${command}" cwd=${cwd || "(undefined)"} level=${level}`);
 
-  if (sandboxDisabled || !isWindows()) {
-    logger.info(LogTag.Runtime, `[Sandbox] wrapWithSandbox: skip (sandboxDisabled=${sandboxDisabled} isWindows=${isWindows()})`);
-    return { ok: false, reason: "disabled", detail: `sandboxDisabled=${sandboxDisabled} isWindows=${isWindows()}` };
+  if (sandboxDisabled || (!isWindows() && !isLinux())) {
+    logger.info(LogTag.Runtime, `[Sandbox] wrapWithSandbox: skip (sandboxDisabled=${sandboxDisabled} platform=${process.platform})`);
+    return { ok: false, reason: "disabled", detail: `sandboxDisabled=${sandboxDisabled} platform=${process.platform}` };
   }
 
   // full 档位不走沙箱（正常情况下调用方已提前分流，这里是防御性兜底）

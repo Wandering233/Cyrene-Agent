@@ -105,13 +105,13 @@
 | UPD-04 | ❌ | 更新签名/校验 | 无 Linux 签名 | minisign/GPG 或 sha512 + 文档 | P1 |
 | UPD-05 | ❌ | Electron/宿主原子更新 | 宿主随包更新，无版本校验 | 协议版本/宿主版本绑定 | P1 |
 | UPD-06 | ❌ | 回滚/旧版本保留 | 无 | 失败回滚、保留上一版 | P2 |
-| SBX-01 | ❌ | SRT Linux 初始化 | `initSandbox` 非 Windows 直接 return | Linux 分支、`checkDependencies` | P0 |
-| SBX-02 | ❌ | bwrap/socat/rg 依赖 | 本机 `bwrap`/`rg` 有、`socat` 缺失 | 依赖检查、安装文档/打包 | P0 |
+| SBX-01 | 🟡 | SRT Linux 初始化 | 已加载 SRT、调用 `checkDependenciesAsync`；本机因 socat 缺失保持 fail-closed | 安装 socat 后实机初始化/bwrap | P0 |
+| SBX-02 | 🟡 | bwrap/socat/rg 依赖 | 启动检查并报告 `socat not installed`；bwrap/rg 已有 | 安装文档/打包；socat 实机 | P0 |
 | SBX-03 | ❌ | seccomp 二进制 asarUnpack | 只有 Windows vendor | 解包/路径/执行验证 | P1 |
-| SBX-04 | ❌ | 档位映射 | `windows.srtWin` 固定写入配置 | Linux config 拆分、read-only/scoped/per-action | P0 |
+| SBX-04 | 🟡 | 档位映射 | `buildSandboxConfig` 在 Linux 省略 windows 块；档位文件系统逻辑复用；单测成功路径 | 实机 bwrap 档位验证 | P0 |
 | SBX-05 | ❌ | 网络 allowlist/DNS/代理 | 无 Linux 网络沙箱 | socat 桥、域名白名单 | P1 |
 | SBX-06 | ❌ | AppArmor/userns 检测 | 无 | Ubuntu 24.04 检测与提示 | P1 |
-| SBX-07 | ❌ | fail-closed 错误/测试 | 非 Windows 直接不可用 | 明确错误码、集成测试 | P1 |
+| SBX-07 | 🟡 | fail-closed 错误/测试 | 缺依赖时 `isSandboxReady=false`，wrap 返回 not_ready；单测覆盖 | 错误码映射/真实命令集成 | P1 |
 | SBX-08 | ❌ | GUI 命令 Wayland socket | 无 | bwrap 绑定 `XDG_RUNTIME_DIR/wayland-*` | P2 |
 | WIN-01 | ❌ | 普通窗口定位/居中/恢复 | `toast-window.ts` 用 `setBounds`；Wayland 无效 | 宿主化或接受合成器放置 | P1 |
 | WIN-02 | ❌ | 普通窗口置顶 | `setAlwaysOnTop` 原生 Wayland 无效 | 仅桌宠有方案；普通窗口需 layer-shell/扩展 | P1 |

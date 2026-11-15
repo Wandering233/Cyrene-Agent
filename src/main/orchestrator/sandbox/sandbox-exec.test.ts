@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   initialize: vi.fn(),
   reset: vi.fn(),
   wrapArgv: vi.fn(),
+  checkDependenciesAsync: vi.fn(),
 }));
 
 const permState = vi.hoisted(() => ({
@@ -53,6 +54,7 @@ vi.mock("@anthropic-ai/sandbox-runtime", () => ({
     initialize: mocks.initialize,
     reset: mocks.reset,
     wrapWithSandboxArgv: mocks.wrapArgv,
+    checkDependenciesAsync: mocks.checkDependenciesAsync,
   },
 }));
 
@@ -162,14 +164,34 @@ describe("resolveSandboxSessionFilesystem", () => {
 // ── initSandbox：启动检测 ────────────────────────────────
 
 describe("initSandbox", () => {
-  it("非 Windows 平台 → 跳过初始化，wrap 返回 disabled", async () => {
+  it("Linux 缺少依赖 → fail-closed，wrap 返回 not_ready", async () => {
     Object.defineProperty(process, "platform", { value: "linux", configurable: true });
+    mocks.checkDependenciesAsync.mockResolvedValue({ errors: ["socat not installed"], warnings: [] });
 
     await sb.initSandbox();
 
     expect(sb.isSandboxReady()).toBe(false);
     expect(mocks.resolveSrtWin).not.toHaveBeenCalled();
-    await expect(sb.wrapWithSandbox("ls")).resolves.toMatchObject({ ok: false, reason: "disabled" });
+    await expect(sb.wrapWithSandbox("ls")).resolves.toMatchObject({ ok: false, reason: "not_ready" });
+  });
+
+
+  it("Linux 依赖齐全 → 初始化 bubblewrap 并省略 windows 配置", async () => {
+    Object.defineProperty(process, "platform", { value: "linux", configurable: true });
+    mocks.checkDependenciesAsync.mockResolvedValue({ errors: [], warnings: [] });
+    mocks.wrapArgv.mockResolvedValue({ argv: ["bwrap", "--", "bash", "-c", "echo hi"], env: { CYRENE_SANDBOX: "1" } });
+
+    await sb.initSandbox();
+    const cwd = makeTempDir();
+    const result = await sb.wrapWithSandbox("echo hi", cwd);
+
+    expect(result).toMatchObject({ ok: true, argv: ["bwrap", "--", "bash", "-c", "echo hi"] });
+    expect(mocks.initialize).toHaveBeenCalledWith(expect.objectContaining({
+      filesystem: expect.any(Object),
+    }));
+    const config = mocks.initialize.mock.calls.at(-1)?.[0];
+    expect(config).not.toHaveProperty("windows");
+    expect(sb.isSandboxReady()).toBe(true);
   });
 
   it.each(["0", "false"])("CYRENE_SRT=%s → 沙箱被禁用，不加载 SRT", async (value) => {
