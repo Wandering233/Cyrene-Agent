@@ -74,6 +74,10 @@ pub enum HostEvent {
         button: Option<u32>,
         #[serde(skip_serializing_if = "Option::is_none")]
         time: Option<u32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        delta_x: Option<f64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        delta_y: Option<f64>,
     },
     Drag {
         phase: DragPhase,

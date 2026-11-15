@@ -740,6 +740,20 @@ impl Overlay {
             y,
             button,
             time,
+            delta_x: None,
+            delta_y: None,
+        });
+    }
+
+    fn send_axis(&self, x: f64, y: f64, time: u32, delta_x: f64, delta_y: f64) {
+        self.writer.send(&HostEvent::Pointer {
+            event: PointerEventName::Axis,
+            x,
+            y,
+            button: None,
+            time: Some(time),
+            delta_x: Some(delta_x),
+            delta_y: Some(delta_y),
         });
     }
 
@@ -980,8 +994,17 @@ impl PointerHandler for Overlay {
                     vertical,
                     ..
                 } => {
-                    self.send_pointer(PointerEventName::Axis, x, y, None, Some(time));
-                    let _ = (horizontal, vertical);
+                    let dx = if horizontal.absolute != 0.0 {
+                        horizontal.absolute
+                    } else {
+                        horizontal.discrete as f64 * 15.0
+                    };
+                    let dy = if vertical.absolute != 0.0 {
+                        vertical.absolute
+                    } else {
+                        vertical.discrete as f64 * 15.0
+                    };
+                    self.send_axis(x, y, time, dx, dy);
                 }
             }
         }

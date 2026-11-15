@@ -64,6 +64,13 @@ export class PetOverlayController {
   private failed = false;
   private disposed = false;
   private latest: LatestFrame | null = null;
+  private lastPointerClick: {
+    button: "left" | "middle" | "right";
+    at: number;
+    x: number;
+    y: number;
+    count: number;
+  } | null = null;
   private frameSeq = 0;
   private readyEmitted = false;
   private pageLoaded = false;
@@ -406,20 +413,50 @@ export class PetOverlayController {
       case "up": {
         const button = pointerButtonName(event.button);
         if (!button) return;
+        const clickCount = event.event === "down"
+          ? this.resolveClickCount(button, x, y)
+          : this.lastPointerClick?.count ?? 1;
         this.window.webContents.sendInputEvent({
           type: event.event === "down" ? "mouseDown" : "mouseUp",
           x,
           y,
           button,
-          clickCount: 1,
+          clickCount,
         });
         break;
       }
-      case "axis":
-        // Scroll forwarding is a separate follow-up; the pet page has no
-        // wheel interaction yet.
+      case "axis": {
+        const deltaX = event.delta_x ?? 0;
+        const deltaY = event.delta_y ?? 0;
+        if (deltaX === 0 && deltaY === 0) return;
+        this.window.webContents.sendInputEvent({
+          type: "mouseWheel",
+          x,
+          y,
+          deltaX,
+          deltaY,
+          canScroll: true,
+        });
         break;
+      }
     }
+  }
+
+  private resolveClickCount(
+    button: "left" | "middle" | "right",
+    x: number,
+    y: number,
+  ): number {
+    const now = Date.now();
+    const previous = this.lastPointerClick;
+    const near = previous
+      && previous.button === button
+      && now - previous.at <= 400
+      && Math.abs(previous.x - x) <= 4
+      && Math.abs(previous.y - y) <= 4;
+    const count = near ? Math.min(3, previous!.count + 1) : 1;
+    this.lastPointerClick = { button, at: now, x, y, count };
+    return count;
   }
 
   private handleDrag(event: DragEvent): void {

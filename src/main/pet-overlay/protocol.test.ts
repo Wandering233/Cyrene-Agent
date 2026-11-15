@@ -21,6 +21,19 @@ describe("pet overlay protocol", () => {
     expect(parseHostEvent('{"type":42}')).toBeNull();
   });
 
+  it("parses axis deltas", () => {
+    expect(parseHostEvent(
+      '{"type":"pointer","event":"axis","x":12,"y":34,"delta_x":0,"delta_y":15}',
+    )).toEqual({
+      type: "pointer",
+      event: "axis",
+      x: 12,
+      y: 34,
+      delta_x: 0,
+      delta_y: 15,
+    });
+  });
+
   it("validates frame stride", () => {
     expect(frameStride(400 * 500 * 4, 400, 500)).toBe(1600);
     expect(frameStride(400 * 500 * 4 - 1, 400, 500)).toBeNull();

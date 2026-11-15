@@ -98,6 +98,8 @@ export interface PointerEvent {
   y: number;
   button?: number;
   time?: number;
+  delta_x?: number;
+  delta_y?: number;
 }
 
 export type DragPhase = "start" | "move" | "end";
