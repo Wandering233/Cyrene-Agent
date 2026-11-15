@@ -25,6 +25,8 @@ export interface ScreenshotServiceDeps {
   /** Wayland/Linux native capture backend; mutually exclusive with the Windows helper. */
   capture?(interactive: boolean): Promise<{ filePath: string; width: number; height: number }>;
   copyToClipboard?(filePath: string): void;
+  /** Optional annotation editor; return null when the user cancels. */
+  annotate?(filePath: string): Promise<string | null>;
   registerShortcut(accelerator: string, callback: () => void): boolean;
   unregisterShortcut(accelerator: string): void;
   /** 原生 helper 是否可用；缺省视为可用（保持既有行为）。 */
@@ -107,13 +109,21 @@ export function createScreenshotService(deps: ScreenshotServiceDeps): Screenshot
     if (deps.capture) {
       try {
         const result = await deps.capture(true);
+        let filePath = result.filePath;
+        let hasAnnotations = false;
+        if (deps.annotate) {
+          const annotated = await deps.annotate(filePath);
+          if (!annotated) return { ok: false, reason: "SCREENSHOT_CANCELLED" };
+          filePath = annotated;
+          hasAnnotations = true;
+        }
         sendInsert({
-          filePath: result.filePath,
+          filePath,
           width: result.width,
           height: result.height,
           mime: "image/png",
-          previewUrl: pathToFileURL(result.filePath).toString(),
-          hasAnnotations: false,
+          previewUrl: pathToFileURL(filePath).toString(),
+          hasAnnotations,
         });
         return { ok: true };
       } catch (error) {

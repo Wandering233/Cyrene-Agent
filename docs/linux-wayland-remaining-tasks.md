@@ -67,8 +67,8 @@
 |---|---|---|---|---|---|
 | SHOT-01 | 🟡 | portal Screenshot v2 | 新增 `portal-screenshot.ts`（dbus-next、Response 订阅、URI 校验）；本机 Hyprland portal 非交互返回 2 | 其他 DE 实机；交互返回 0 验证 | P0 |
 | SHOT-02 | 🟡 | 全屏/区域/窗口截图 | Hyprland：grim 全屏实测、slurp 选择取消路径实测；区域选择成功待人工 | 窗口截图/多屏 | P0 |
-| SHOT-03 | ❌ | 标注 overlay | Windows helper 内置；Linux 无 | 全屏/逐屏 overlay、画笔、保存/复制 | P0 |
-| SHOT-04 | 🟡 | 剪贴板/文件保存 | 截图写入 userData/screenshots（UUID）；热键路径使用 ClipboardItem 写剪贴板；未实机验证剪贴板 | 剪贴板实机、临时文件清理 | P0 |
+| SHOT-03 | ✅ | 标注 overlay | 新增 Electron 标注窗口（画笔/矩形/箭头/撤销/清空/保存/取消）；自动化保存实测生成同尺寸 annotated PNG | 文字/马赛克可后续 | P0 |
+| SHOT-04 | ✅ | 剪贴板/文件保存 | 截图/标注写入 userData/screenshots；热键 ClipboardItem 写剪贴板（Electron 实测读回 image/png）；标注保存实测 | 已验收 | P0 |
 | SHOT-05 | ❌ | 多屏/HiDPI 截图 | 无 | 区域坐标、缩放换算 | P0 |
 | SHOT-06 | 🟡 | DE 兜底 | Hyprland grim/slurp 已实现；其他 DE 走 portal | KDE Spectacle/GNOME DBus、grim 缺失回退 | P1 |
 | SHOT-07 | 🟡 | 全局截图热键 | Linux 已注册 `globalShortcut`，热键路径调用 grim 全屏；Wayland portal 触发未验证 | portal GlobalShortcuts 或桌面快捷键 | P0 |

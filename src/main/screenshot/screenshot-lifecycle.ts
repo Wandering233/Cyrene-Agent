@@ -8,6 +8,7 @@ import { createIpcScope, type IpcScope } from "../application/ipc-scope";
 import { ElectronScreenshotHelperClient } from "./helper-client";
 import { resolveScreenshotHelperPath } from "./helper-path";
 import { captureLinuxScreenshot, pruneScreenshotDirectory } from "./linux-screenshot";
+import { annotateScreenshot } from "../annotation/annotation-window";
 import {
   createScreenshotService,
   validateScreenshotInsert,
@@ -141,6 +142,9 @@ export function initializeScreenshotService(
   const service = createScreenshotService({
     client,
     capture,
+    annotate: useLinuxCapture
+      ? (filePath) => annotateScreenshot(filePath, getReactChatWindow())
+      : undefined,
     copyToClipboard: (filePath) => {
       try {
         const png = fs.readFileSync(filePath);

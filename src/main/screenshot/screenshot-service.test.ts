@@ -350,3 +350,46 @@ describe("Wayland capture backend", () => {
     expect(client.start).not.toHaveBeenCalled();
   });
 });
+
+describe("Linux annotation flow", () => {
+  function serviceWith(annotate: (filePath: string) => Promise<string | null>) {
+    const client = {
+      start: vi.fn(), ensureStarted: vi.fn(), shutdown: vi.fn(),
+    } as unknown as ScreenshotHelperClient;
+    const sendInsert = vi.fn();
+    const service = createScreenshotService({
+      client,
+      sendInsert,
+      capture: vi.fn(async () => ({
+        filePath: "/tmp/cyrene-test-screenshots/raw.png",
+        width: 400,
+        height: 500,
+      })),
+      annotate,
+      registerShortcut: () => true,
+      unregisterShortcut: () => {},
+      isAvailable: () => true,
+    });
+    return { service, sendInsert };
+  }
+
+  it("sends the annotated file and marks hasAnnotations", async () => {
+    const annotate = vi.fn(async () => "/tmp/cyrene-test-screenshots/annotated.png");
+    const { service, sendInsert } = serviceWith(annotate);
+    await expect(service.startFromChatButton()).resolves.toEqual({ ok: true });
+    expect(annotate).toHaveBeenCalledWith("/tmp/cyrene-test-screenshots/raw.png");
+    expect(sendInsert).toHaveBeenCalledWith(expect.objectContaining({
+      filePath: "/tmp/cyrene-test-screenshots/annotated.png",
+      hasAnnotations: true,
+    }));
+  });
+
+  it("does not insert when the annotation editor is cancelled", async () => {
+    const { service, sendInsert } = serviceWith(async () => null);
+    await expect(service.startFromChatButton()).resolves.toEqual({
+      ok: false,
+      reason: "SCREENSHOT_CANCELLED",
+    });
+    expect(sendInsert).not.toHaveBeenCalled();
+  });
+});
