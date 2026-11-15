@@ -9,6 +9,8 @@ import { ElectronScreenshotHelperClient } from "./helper-client";
 import { resolveScreenshotHelperPath } from "./helper-path";
 import { captureLinuxScreenshot, pruneScreenshotDirectory } from "./linux-screenshot";
 import { annotateScreenshot } from "../annotation/annotation-window";
+import { installHyprlandScreenshotHotkey } from "./hyprland-hotkey";
+import { setScreenshotControlHandler } from "../control/control-server";
 import {
   createScreenshotService,
   validateScreenshotInsert,
@@ -139,6 +141,7 @@ export function initializeScreenshotService(
   }
   console.log("[Screenshot] helper output-dir =", screenshotDirectory);
 
+  let hyprlandHotkey: ReturnType<typeof installHyprlandScreenshotHotkey> = null;
   const service = createScreenshotService({
     client,
     capture,
@@ -156,8 +159,10 @@ export function initializeScreenshotService(
       }
     },
     isAvailable: () => (useLinuxCapture ? true : isHelperAvailable()),
-    registerShortcut: (accelerator, callback) =>
-      globalShortcut.register(accelerator, callback),
+    registerShortcut: (accelerator, callback) => {
+      if (hyprlandHotkey) return true;
+      return globalShortcut.register(accelerator, callback);
+    },
     unregisterShortcut: (accelerator) => globalShortcut.unregister(accelerator),
     sendInsert: (data) => {
       const validated = validateInsert(data);
@@ -206,6 +211,11 @@ export function initializeScreenshotService(
     );
   } else if (useLinuxCapture) {
     console.log("[Screenshot] Linux Wayland backend: grim/slurp (Hyprland) or xdg-desktop-portal");
+  }
+  setScreenshotControlHandler(async () => { await service.startFromHotkey(); });
+  hyprlandHotkey = installHyprlandScreenshotHotkey(options.initialHotkey);
+  if (hyprlandHotkey) {
+    app.once("will-quit", () => hyprlandHotkey?.uninstall());
   }
   service.init(options.initialHotkey);
   return service;

@@ -71,7 +71,7 @@
 | SHOT-04 | ✅ | 剪贴板/文件保存 | 截图/标注写入 userData/screenshots；热键 ClipboardItem 写剪贴板（Electron 实测读回 image/png）；标注保存实测 | 已验收 | P0 |
 | SHOT-05 | ❌ | 多屏/HiDPI 截图 | 无 | 区域坐标、缩放换算 | P0 |
 | SHOT-06 | 🟡 | DE 兜底 | Hyprland grim/slurp 已实现；其他 DE 走 portal | KDE Spectacle/GNOME DBus、grim 缺失回退 | P1 |
-| SHOT-07 | 🟡 | 全局截图热键 | Linux 已注册 `globalShortcut`，热键路径调用 grim 全屏；Wayland portal 触发未验证 | portal GlobalShortcuts 或桌面快捷键 | P0 |
+| SHOT-07 | ✅ | 全局截图热键 | Hyprland 自动 `hl.bind("ALT+SHIFT+S")` → control socket → grim；实机按键生成 949KB PNG；Electron globalShortcut 在 Wayland 不可靠时由桌面 bind 兜底 | KDE/GNOME portal 仍待适配 | P0 |
 | SHOT-08 | 🟡 | 权限/隐私/临时文件 | 截图文件 0600；portal 原文件删除；启动清理 7 天/100 个上限；单测覆盖 | 权限提示/失败清理边界 | P1 |
 | TOAST-01 | ❌ | Toast 使用原生 overlay host | `toast-window.ts` 仍是普通 BrowserWindow | 复用 offscreen + host | P0 |
 | TOAST-02 | ❌ | Toast 光标/角落定位 | `setBounds` 在原生 Wayland 无效；光标 0,0 | 宿主定位或系统通知 | P0 |

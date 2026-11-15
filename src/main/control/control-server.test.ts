@@ -3,7 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import net from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { startControlServer } from "./control-server";
+import { setScreenshotControlHandler, startControlServer } from "./control-server";
 
 const tempDirs: string[] = [];
 
@@ -54,6 +54,25 @@ describe("control socket", () => {
       });
     } finally {
       server.close();
+    }
+  });
+
+  it("routes the screenshot command to the registered handler", async () => {
+    const socketPath = makeSocketPath();
+    const screenshot = vi.fn();
+    setScreenshotControlHandler(screenshot);
+    const server = startControlServer({
+      "show-chat": vi.fn(),
+      "show-settings": vi.fn(),
+      "toggle-pet": vi.fn(),
+      quit: vi.fn(),
+    }, socketPath);
+    try {
+      await expect(send(socketPath, "screenshot")).resolves.toEqual({ ok: true, command: "screenshot" });
+      expect(screenshot).toHaveBeenCalledTimes(1);
+    } finally {
+      server.close();
+      setScreenshotControlHandler(null);
     }
   });
 

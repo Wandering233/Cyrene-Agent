@@ -11,7 +11,17 @@ export interface ControlServerHandlers {
   "show-chat"(): void | Promise<void>;
   "show-settings"(): void | Promise<void>;
   "toggle-pet"(): void | Promise<void>;
+  screenshot?(): void | Promise<void>;
   quit(): void | Promise<void>;
+}
+
+let screenshotHandler: (() => void | Promise<void>) | null = null;
+
+/** Register the screenshot action after the core screenshot service exists. */
+export function setScreenshotControlHandler(
+  handler: (() => void | Promise<void>) | null,
+): void {
+  screenshotHandler = handler;
 }
 
 export interface ControlServer {
@@ -62,7 +72,12 @@ export function startControlServer(
       return;
     }
     try {
-      await handlers[command as Exclude<ControlCommand, "ping">]();
+      if (command === "screenshot") {
+        if (!screenshotHandler) throw new Error("screenshot backend not ready");
+        await screenshotHandler();
+      } else {
+        await handlers[command as Exclude<ControlCommand, "ping" | "screenshot">]();
+      }
       socket.write(JSON.stringify({ ok: true, command }) + "\n");
     } catch (error) {
       socket.write(JSON.stringify({
