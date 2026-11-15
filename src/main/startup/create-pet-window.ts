@@ -1,6 +1,7 @@
 import { app, BrowserWindow, screen } from "electron";
 import path from "node:path";
 import { IPC } from "../../shared/ipc-channels";
+import { createPetOverlayWindow, shouldUsePetOverlay } from "../pet-overlay";
 
 /** 桌宠窗口的基础尺寸（zoom=1.0 时）。缩放因子改变窗口与模型尺寸，二者同步。 */
 export const PET_WINDOW_BASE_WIDTH = 400;
@@ -29,6 +30,8 @@ export interface CreatePetWindowContext {
 export interface CreatePetWindowOptions {
   /** 窗口 ready 后是否立即 show；默认 true。启动闪屏场景可先隐藏，等闪屏关闭再显示。 */
   showOnReady?: boolean;
+  /** 原生 overlay 失败后的回退路径：强制使用普通 BrowserWindow。 */
+  forceNormal?: boolean;
 }
 
 /**
@@ -84,6 +87,27 @@ export function createPetWindow(
     const wa = screen.getPrimaryDisplay().workArea;
     restoreX = Math.round(wa.x + (wa.width - petWidth) / 2);
     restoreY = Math.round(wa.y + (wa.height - petHeight) / 2);
+  }
+
+  if (!options.forceNormal && shouldUsePetOverlay()) {
+    try {
+      const overlay = createPetOverlayWindow({
+        isDev: ctx.isDev,
+        width: petWidth,
+        height: petHeight,
+        x: restoreX,
+        y: restoreY,
+        zoom,
+        alwaysOnTop: settings.petAlwaysOnTop ?? true,
+        showOnReady,
+      });
+      if (overlay) {
+        console.log("[Cyrene] using native Wayland pet overlay host");
+        return overlay.window;
+      }
+    } catch (error) {
+      console.error("[Cyrene] native pet overlay unavailable, falling back:", error);
+    }
   }
 
   const win = new BrowserWindow({

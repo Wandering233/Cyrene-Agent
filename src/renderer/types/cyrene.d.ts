@@ -3,6 +3,7 @@ export {};
 declare global {
   interface Window {
     cyrene: {
+      petOverlayMode: boolean;
       minimize: () => void;
       hide: () => void;
       quit: () => void;
@@ -14,6 +15,7 @@ declare global {
       getCursorPosition: () => Promise<{ x: number; y: number } | null>;
       onPetZoom: (callback: (zoom: number) => void) => () => void;
       onPetVisibilityChanged: (callback: (visible: boolean) => void) => () => void;
+      onPetOverlayDrag: (callback: (payload: { phase: "start" | "end" }) => void) => () => void;
     };
   }
 }

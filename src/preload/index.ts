@@ -34,6 +34,8 @@ import type { LearnExamAnswerValue, LearnExamChangedEvent, LearnExamCreatedEvent
 const rendererTargetId = crypto.randomUUID();
 
 const cyreneApi = {
+  /** True only for the hidden offscreen renderer hosted by the native Wayland overlay. */
+  petOverlayMode: process.argv.includes("--cyrene-pet-overlay=1"),
   minimize: () => ipcRenderer.send(IPC.WINDOW_MINIMIZE),
   hide: () => ipcRenderer.send(IPC.WINDOW_CLOSE),
   quit: () => ipcRenderer.send(IPC.APP_QUIT),
@@ -56,6 +58,11 @@ const cyreneApi = {
     const listener = (_e: unknown, visible: boolean) => callback(visible);
     ipcRenderer.on(IPC.PET_VISIBILITY_CHANGED, listener);
     return () => ipcRenderer.off(IPC.PET_VISIBILITY_CHANGED, listener);
+  },
+  onPetOverlayDrag: (callback: (payload: { phase: "start" | "end" }) => void) => {
+    const listener = (_e: unknown, payload: { phase: "start" | "end" }) => callback(payload);
+    ipcRenderer.on(IPC.PET_OVERLAY_DRAG, listener);
+    return () => ipcRenderer.off(IPC.PET_OVERLAY_DRAG, listener);
   },
 };
 

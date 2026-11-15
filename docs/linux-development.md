@@ -73,7 +73,7 @@ pnpm run package:linux
 
 - **受限 Shell 沙箱**：SRT 沙箱目前只有 Windows 实现。Linux 下 `read-only` / `scoped` / `per-action` 档位的 `run_shell` 会按 fail-closed 拒绝；只有 `full` 权限可直接执行。日常代码读取、搜索请优先使用 Read/Glob/Grep。
 - **原生截图**：`native/cyrene-screenshot` 依赖 Win32/DXGI/Direct2D，Linux 暂无原生实现。后续可用 Electron `desktopCapturer` 或 xdg-desktop-portal 补齐。
-- **鼠标穿透**：Linux 不支持 `setIgnoreMouseEvents(..., { forward: true })` 的鼠标事件转发。当前桌宠窗口整窗可交互，透明边角会拦截点击；真正的逐像素穿透需要额外实现。
+- **鼠标穿透**：Linux 原生 Wayland 下 Electron 的 `setIgnoreMouseEvents` 实测不可依赖。现已提供 `native/cyrene-overlay-host`（layer-shell + alpha input region）作为纯 Wayland 方案，详见 `docs/linux-wayland-overlay.md`；未启用或宿主不可用时回退普通窗口，透明边角仍会拦截点击。
 - **开机自启**：`app.setLoginItemSettings` 在 Linux 上是 no-op，设置项当前不会生效。
 - **应用内更新**：尚未配置 Linux 发布产物与更新源；`APPIMAGE` 环境外的更新检查会跳过。
 - **Wayland 限制**：透明窗口、置顶层级、全局快捷键与托盘行为取决于合成器和桌面环境；遇到问题请同时记录 `XDG_SESSION_TYPE` 与桌面版本。

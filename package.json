@@ -41,8 +41,8 @@
     "seed:usage": "node scripts/seed-usage-stats.mjs",
     "build:music-component": "node scripts/packaging/build-music-component.mjs",
     "package:win:dir": "pnpm run build && pnpm run build:screenshot-helper && pnpm run prepare:mingit && pnpm run prepare:mpv && electron-builder --win --dir",
-    "package:linux:dir": "pnpm run build && electron-builder --linux --dir",
-    "package:linux": "pnpm run build && electron-builder --linux --publish never",
+    "package:linux:dir": "pnpm run build && pnpm run build:overlay-host && electron-builder --linux --dir",
+    "package:linux": "pnpm run build && pnpm run build:overlay-host && electron-builder --linux --publish never",
     "dev": "pnpm run build:main && pnpm run build:preload && pnpm run build:cli && concurrently \"vite --strictPort\" \"cross-env VITE_DEV=1 electron .\"",
     "start": "electron .",
     "test": "vitest run",
@@ -59,7 +59,8 @@
     "check:plugin-sdk": "node scripts/plugin-sdk/build-sdk.mjs && node scripts/plugin-sdk/verify-package.mjs",
     "test:plugin-examples": "node scripts/plugin-sdk/test-examples.mjs",
     "release": "commit-and-tag-version",
-    "release:dry": "commit-and-tag-version --dry-run"
+    "release:dry": "commit-and-tag-version --dry-run",
+    "build:overlay-host": "node scripts/build/overlay-host.mjs"
   },
   "engines": {
     "node": ">=24 <25",

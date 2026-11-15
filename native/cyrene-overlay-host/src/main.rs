@@ -1,0 +1,998 @@
+mod alpha;
+mod protocol;
+
+use std::{
+    env,
+    io::{BufRead, BufReader, Read, Write},
+    os::unix::net::UnixStream,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+    thread,
+    time::Duration,
+};
+
+use alpha::{Rect, alpha_rects};
+use anyhow::{Context, Result, anyhow, bail};
+use calloop::{
+    EventLoop, LoopSignal,
+    channel::{Event as ChannelEvent, Sender, channel},
+};
+use protocol::{Control, DragPhase, FrameHeader, HostEvent, PointerEventName};
+use serde_json::Value;
+use smithay_client_toolkit::{
+    compositor::{CompositorHandler, CompositorState},
+    delegate_compositor, delegate_layer, delegate_output, delegate_pointer, delegate_registry,
+    delegate_relative_pointer, delegate_seat, delegate_shm,
+    output::{OutputHandler, OutputState},
+    registry::{ProvidesRegistryState, RegistryState},
+    registry_handlers,
+    seat::{
+        Capability, SeatHandler, SeatState,
+        pointer::{PointerEvent, PointerEventKind, PointerHandler},
+        relative_pointer::{RelativeMotionEvent, RelativePointerHandler, RelativePointerState},
+    },
+    shell::{
+        WaylandSurface,
+        wlr_layer::{
+            Anchor, KeyboardInteractivity, Layer, LayerShell, LayerShellHandler, LayerSurface,
+            LayerSurfaceConfigure,
+        },
+    },
+    shm::{
+        Shm, ShmHandler,
+        slot::{Buffer, SlotPool},
+    },
+};
+use tracing::{debug, error, info, warn};
+use wayland_client::protocol::wl_shm::Format;
+use wayland_client::{
+    Connection, Dispatch, QueueHandle,
+    globals::registry_queue_init,
+    protocol::{wl_output, wl_pointer, wl_region, wl_seat, wl_surface},
+};
+use wayland_protocols::wp::relative_pointer::zv1::client::zwp_relative_pointer_v1::ZwpRelativePointerV1;
+
+const DEFAULT_WIDTH: u32 = 400;
+const DEFAULT_HEIGHT: u32 = 500;
+const BUFFER_COUNT: usize = 3;
+const MAX_FRAME_BYTES: usize = 128 * 1024 * 1024;
+const INPUT_ALPHA_THRESHOLD: u8 = 10;
+const INPUT_REGION_CELL: u32 = 4;
+
+#[derive(Clone)]
+struct EventWriter {
+    stream: Arc<Mutex<UnixStream>>,
+}
+
+impl EventWriter {
+    fn new(stream: UnixStream) -> Self {
+        Self {
+            stream: Arc::new(Mutex::new(stream)),
+        }
+    }
+
+    fn send(&self, event: &HostEvent) {
+        let Ok(mut stream) = self.stream.lock() else {
+            return;
+        };
+        if let Err(err) = serde_json::to_writer(&mut *stream, event) {
+            warn!("failed to serialize host event: {err}");
+            return;
+        }
+        if let Err(err) = stream.write_all(b"\n").and_then(|()| stream.flush()) {
+            warn!("failed to write host event: {err}");
+        }
+    }
+}
+
+enum Inbound {
+    Control(Control),
+    Frame(FrameHeader, Vec<u8>),
+    Closed,
+    ReadError(String),
+}
+
+fn main() -> Result<()> {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "cyrene_overlay_host=info".into()),
+        )
+        .with_writer(std::io::stderr)
+        .init();
+
+    let socket_path = parse_socket_path()?;
+    info!("connecting to Electron socket {}", socket_path.display());
+    let stream = connect_with_retry(&socket_path)?;
+    let writer = EventWriter::new(stream.try_clone().context("clone socket")?);
+
+    if let Err(err) = run(
+        stream.try_clone().context("clone reader socket")?,
+        writer.clone(),
+    ) {
+        writer.send(&HostEvent::Error {
+            code: "HOST_FAILED".into(),
+            message: err.to_string(),
+        });
+        return Err(err);
+    }
+    Ok(())
+}
+
+fn parse_socket_path() -> Result<PathBuf> {
+    let mut args = env::args().skip(1);
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--socket" => {
+                let path = args
+                    .next()
+                    .ok_or_else(|| anyhow!("--socket requires a path"))?;
+                return Ok(PathBuf::from(path));
+            }
+            "--help" | "-h" => {
+                println!("Usage: cyrene-overlay-host --socket <unix-socket-path>");
+                std::process::exit(0);
+            }
+            other => bail!("unknown argument: {other}"),
+        }
+    }
+    bail!("missing --socket <unix-socket-path>")
+}
+
+fn connect_with_retry(path: &PathBuf) -> Result<UnixStream> {
+    let mut last_err = None;
+    for attempt in 0..40 {
+        match UnixStream::connect(path) {
+            Ok(stream) => return Ok(stream),
+            Err(err) => {
+                last_err = Some(err);
+                if attempt < 39 {
+                    thread::sleep(Duration::from_millis(50));
+                }
+            }
+        }
+    }
+    Err(anyhow!(
+        "could not connect to {}: {}",
+        path.display(),
+        last_err.map(|e| e.to_string()).unwrap_or_default()
+    ))
+}
+
+fn spawn_reader(stream: UnixStream, sender: Sender<Inbound>) {
+    thread::spawn(move || {
+        let mut reader = BufReader::new(stream);
+        loop {
+            let mut line = String::new();
+            match reader.read_line(&mut line) {
+                Ok(0) => {
+                    let _ = sender.send(Inbound::Closed);
+                    return;
+                }
+                Ok(_) => {}
+                Err(err) => {
+                    let _ = sender.send(Inbound::ReadError(format!("socket read failed: {err}")));
+                    return;
+                }
+            }
+
+            if line.len() > 1024 * 1024 {
+                let _ = sender.send(Inbound::ReadError("socket line too long".into()));
+                return;
+            }
+
+            let value: Value = match serde_json::from_str(&line) {
+                Ok(value) => value,
+                Err(err) => {
+                    let _ = sender.send(Inbound::ReadError(format!("invalid JSON: {err}")));
+                    return;
+                }
+            };
+
+            if value.get("type").and_then(Value::as_str) == Some("frame") {
+                let header: FrameHeader = match serde_json::from_value(value) {
+                    Ok(header) => header,
+                    Err(err) => {
+                        let _ =
+                            sender.send(Inbound::ReadError(format!("invalid frame header: {err}")));
+                        return;
+                    }
+                };
+                let Some(len) = header.byte_len() else {
+                    let _ = sender.send(Inbound::ReadError("invalid frame stride".into()));
+                    return;
+                };
+                if len > MAX_FRAME_BYTES {
+                    let _ =
+                        sender.send(Inbound::ReadError(format!("frame too large: {len} bytes")));
+                    return;
+                }
+                let mut pixels = vec![0u8; len];
+                if let Err(err) = reader.read_exact(&mut pixels) {
+                    let _ = sender.send(Inbound::ReadError(format!("truncated frame: {err}")));
+                    return;
+                }
+                if sender.send(Inbound::Frame(header, pixels)).is_err() {
+                    return;
+                }
+            } else {
+                match serde_json::from_value::<Control>(value) {
+                    Ok(control) => {
+                        if sender.send(Inbound::Control(control)).is_err() {
+                            return;
+                        }
+                    }
+                    Err(err) => {
+                        let _ = sender.send(Inbound::ReadError(format!(
+                            "invalid control message: {err}"
+                        )));
+                        return;
+                    }
+                }
+            }
+        }
+    });
+}
+
+fn run(reader_stream: UnixStream, writer: EventWriter) -> Result<()> {
+    let conn = Connection::connect_to_env().context("connect to Wayland display")?;
+    let (globals, event_queue) = registry_queue_init(&conn).context("enumerate Wayland globals")?;
+    let qh = event_queue.handle();
+
+    let compositor = CompositorState::bind(&globals, &qh)
+        .map_err(|err| anyhow!("wl_compositor is unavailable: {err}"))?;
+    let layer_shell = match LayerShell::bind(&globals, &qh) {
+        Ok(layer_shell) => layer_shell,
+        Err(err) => {
+            writer.send(&HostEvent::Error {
+                code: "LAYER_SHELL_UNAVAILABLE".into(),
+                message: format!(
+                    "compositor does not implement wlr-layer-shell ({err}); \
+                     the GNOME fullscreen fallback is not implemented yet"
+                ),
+            });
+            bail!("wlr-layer-shell is unavailable");
+        }
+    };
+    let shm = Shm::bind(&globals, &qh).map_err(|err| anyhow!("wl_shm is unavailable: {err}"))?;
+
+    let surface = compositor.create_surface(&qh);
+    let layer =
+        layer_shell.create_layer_surface(&qh, surface, Layer::Top, Some("cyrene-overlay"), None);
+    layer.set_anchor(Anchor::TOP | Anchor::LEFT);
+    layer.set_keyboard_interactivity(KeyboardInteractivity::None);
+    layer.set_exclusive_zone(-1);
+    layer.set_size(DEFAULT_WIDTH, DEFAULT_HEIGHT);
+    layer.set_margin(100, 0, 0, 100);
+    layer.commit();
+
+    let mut pool =
+        SlotPool::new(pool_size(DEFAULT_WIDTH, DEFAULT_HEIGHT), &shm).context("create shm pool")?;
+    let buffers = create_buffers(&mut pool, DEFAULT_WIDTH, DEFAULT_HEIGHT)?;
+
+    let mut event_loop = EventLoop::<Overlay>::try_new().context("create event loop")?;
+    let signal = event_loop.get_signal();
+    let (sender, channel) = channel::<Inbound>();
+    spawn_reader(reader_stream, sender);
+
+    let mut state = Overlay {
+        registry_state: RegistryState::new(&globals),
+        seat_state: SeatState::new(&globals, &qh),
+        output_state: OutputState::new(&globals, &qh),
+        relative_pointer_state: RelativePointerState::bind(&globals, &qh),
+        shm,
+        qh,
+        compositor,
+        _layer_shell: layer_shell,
+        layer,
+        pool,
+        buffers,
+        width: DEFAULT_WIDTH,
+        height: DEFAULT_HEIGHT,
+        x: 100,
+        y: 100,
+        visible: false,
+        force_interactive: false,
+        latest: None,
+        last_rects: Vec::new(),
+        region_valid: false,
+        output: None,
+        output_size: (0, 0),
+        scale: 1,
+        pointer: None,
+        relative_pointer: None,
+        drag: None,
+        writer,
+        signal,
+        quit: false,
+        ready_sent: false,
+    };
+
+    {
+        let handle = event_loop.handle();
+        smithay_client_toolkit::reexports::calloop_wayland_source::WaylandSource::new(
+            conn.clone(),
+            event_queue,
+        )
+        .insert(handle.clone())
+        .map_err(|err| anyhow!("insert Wayland source: {err}"))?;
+        handle
+            .insert_source(channel, |event, _, state| {
+                if let ChannelEvent::Msg(inbound) = event {
+                    state.handle_inbound(inbound);
+                }
+            })
+            .map_err(|err| anyhow!("insert socket channel: {err}"))?;
+    }
+
+    info!("overlay host running");
+    event_loop
+        .run(None, &mut state, |_| {})
+        .map_err(|err| anyhow!("event loop failed: {err}"))?;
+    Ok(())
+}
+
+fn pool_size(width: u32, height: u32) -> usize {
+    width as usize * height as usize * 4 * BUFFER_COUNT
+}
+
+fn create_buffers(pool: &mut SlotPool, width: u32, height: u32) -> Result<Vec<Buffer>> {
+    let mut buffers = Vec::with_capacity(BUFFER_COUNT);
+    let stride = (width * 4) as i32;
+    for _ in 0..BUFFER_COUNT {
+        let (buffer, _) = pool
+            .create_buffer(width as i32, height as i32, stride, Format::Argb8888)
+            .map_err(|err| anyhow!("create shm buffer: {err}"))?;
+        buffers.push(buffer);
+    }
+    Ok(buffers)
+}
+
+struct DragState {
+    button: u32,
+    start_x: i32,
+    start_y: i32,
+    accum_x: f64,
+    accum_y: f64,
+    started: bool,
+}
+
+struct Overlay {
+    registry_state: RegistryState,
+    seat_state: SeatState,
+    output_state: OutputState,
+    relative_pointer_state: RelativePointerState,
+    shm: Shm,
+    qh: QueueHandle<Overlay>,
+    compositor: CompositorState,
+    _layer_shell: LayerShell,
+    layer: LayerSurface,
+    pool: SlotPool,
+    buffers: Vec<Buffer>,
+    width: u32,
+    height: u32,
+    x: i32,
+    y: i32,
+    visible: bool,
+    force_interactive: bool,
+    latest: Option<(FrameHeader, Vec<u8>)>,
+    last_rects: Vec<Rect>,
+    region_valid: bool,
+    output: Option<wl_output::WlOutput>,
+    output_size: (i32, i32),
+    scale: i32,
+    pointer: Option<wl_pointer::WlPointer>,
+    relative_pointer: Option<ZwpRelativePointerV1>,
+    drag: Option<DragState>,
+    writer: EventWriter,
+    signal: LoopSignal,
+    quit: bool,
+    ready_sent: bool,
+}
+
+impl Overlay {
+    fn handle_inbound(&mut self, inbound: Inbound) {
+        match inbound {
+            Inbound::Control(control) => self.handle_control(control),
+            Inbound::Frame(header, pixels) => self.handle_frame(header, pixels),
+            Inbound::Closed => {
+                info!("Electron socket closed");
+                self.stop();
+            }
+            Inbound::ReadError(message) => {
+                error!("{message}");
+                self.writer.send(&HostEvent::Error {
+                    code: "SOCKET_READ_FAILED".into(),
+                    message,
+                });
+                self.stop();
+            }
+        }
+    }
+
+    fn handle_control(&mut self, control: Control) {
+        match control {
+            Control::Init {
+                width,
+                height,
+                x,
+                y,
+                output,
+                ..
+            } => {
+                debug!("init {width}x{height} at ({x},{y}) output={output:?}");
+                self.x = x;
+                self.y = y;
+                self.resize(width, height);
+                self.clamp_position();
+                self.apply_margins();
+                self.layer.commit();
+                self.send_position();
+                if !self.ready_sent {
+                    self.send_ready();
+                }
+            }
+            Control::Size { width, height } => {
+                self.resize(width, height);
+                self.clamp_position();
+                self.apply_margins();
+                self.layer.set_size(self.width, self.height);
+                self.layer.commit();
+                self.send_position();
+            }
+            Control::Move { x, y } => {
+                self.x = x;
+                self.y = y;
+                self.clamp_position();
+                self.apply_margins();
+                self.layer.commit();
+                self.send_position();
+            }
+            Control::Show => {
+                self.visible = true;
+                self.region_valid = false;
+                self.draw();
+            }
+            Control::Hide => {
+                self.visible = false;
+                self.region_valid = false;
+                self.update_input_region();
+                self.layer.wl_surface().attach(None, 0, 0);
+                self.layer.commit();
+            }
+            Control::Interactive { interactive } => {
+                self.force_interactive = interactive;
+                self.region_valid = false;
+                self.update_input_region();
+                self.layer.commit();
+            }
+            Control::Layer { layer } => {
+                let target = match layer.as_str() {
+                    "overlay" => Layer::Overlay,
+                    "top" | "" => Layer::Top,
+                    other => {
+                        warn!("unknown layer {other:?}; keeping current layer");
+                        return;
+                    }
+                };
+                self.layer.set_layer(target);
+                self.layer.commit();
+            }
+            Control::Quit => self.stop(),
+        }
+    }
+
+    fn resize(&mut self, width: u32, height: u32) {
+        if width == 0 || height == 0 || (width == self.width && height == self.height) {
+            return;
+        }
+        self.width = width;
+        self.height = height;
+        match self.reset_pool() {
+            Ok(()) => {
+                self.latest = None;
+                self.last_rects.clear();
+                self.region_valid = false;
+            }
+            Err(err) => {
+                self.writer.send(&HostEvent::Error {
+                    code: "BUFFER_RESIZE_FAILED".into(),
+                    message: err.to_string(),
+                });
+            }
+        }
+    }
+
+    fn reset_pool(&mut self) -> Result<()> {
+        // Drop buffers before replacing the pool: Buffer holds a Slot that
+        // points into the old pool's memory.
+        self.buffers.clear();
+        self.pool = SlotPool::new(pool_size(self.width, self.height), &self.shm)
+            .context("resize shm pool")?;
+        self.buffers = create_buffers(&mut self.pool, self.width, self.height)?;
+        Ok(())
+    }
+
+    fn handle_frame(&mut self, header: FrameHeader, pixels: Vec<u8>) {
+        if header.width == 0 || header.height == 0 {
+            return;
+        }
+        if header.width != self.width || header.height != self.height {
+            self.resize(header.width, header.height);
+            self.layer.set_size(self.width, self.height);
+            self.layer.commit();
+        }
+        self.latest = Some((header, pixels));
+        if self.visible {
+            self.draw();
+        }
+    }
+
+    fn draw(&mut self) {
+        if !self.visible {
+            return;
+        }
+        self.update_input_region();
+
+        let Some((header, pixels)) = self.latest.as_ref() else {
+            return;
+        };
+        if header.width != self.width || header.height != self.height {
+            return;
+        }
+
+        let mut attached = false;
+        {
+            let pool = &mut self.pool;
+            let width = self.width as usize;
+            let height = self.height as usize;
+            let stride = header.stride as usize;
+            if stride < width * 4 || pixels.len() < stride * height {
+                return;
+            }
+
+            for buffer in &self.buffers {
+                let Some(canvas) = pool.canvas(buffer) else {
+                    continue;
+                };
+                let row_bytes = width * 4;
+                for y in 0..height {
+                    let src = &pixels[y * stride..y * stride + row_bytes];
+                    let dst = &mut canvas[y * row_bytes..y * row_bytes + row_bytes];
+                    dst.copy_from_slice(src);
+                }
+                if buffer.attach_to(self.layer.wl_surface()).is_err() {
+                    continue;
+                }
+                self.layer
+                    .wl_surface()
+                    .damage(0, 0, self.width as i32, self.height as i32);
+                self.layer.commit();
+                attached = true;
+                break;
+            }
+        }
+
+        if !attached {
+            debug!("all shm buffers are busy; dropping a frame");
+        }
+    }
+
+    fn update_input_region(&mut self) {
+        let surface = self.layer.wl_surface();
+        if !self.visible {
+            let region = self.compositor.wl_compositor().create_region(&self.qh, ());
+            surface.set_input_region(Some(&region));
+            region.destroy();
+            self.region_valid = true;
+            return;
+        }
+
+        if self.force_interactive {
+            surface.set_input_region(None);
+            self.region_valid = true;
+            return;
+        }
+
+        let rects = match self.latest.as_ref() {
+            Some((header, pixels)) => alpha_rects(
+                pixels,
+                header.width,
+                header.height,
+                header.stride as usize,
+                INPUT_ALPHA_THRESHOLD,
+                INPUT_REGION_CELL,
+            ),
+            None => Vec::new(),
+        };
+
+        if self.region_valid && rects == self.last_rects {
+            return;
+        }
+
+        let region = self.compositor.wl_compositor().create_region(&self.qh, ());
+        for rect in &rects {
+            region.add(rect.x, rect.y, rect.width, rect.height);
+        }
+        surface.set_input_region(Some(&region));
+        region.destroy();
+        self.last_rects = rects;
+        self.region_valid = true;
+    }
+
+    fn apply_margins(&self) {
+        self.layer.set_margin(self.y, 0, 0, self.x);
+    }
+
+    fn clamp_position(&mut self) {
+        let (out_w, out_h) = self.output_size;
+        if out_w <= 0 || out_h <= 0 {
+            return;
+        }
+        let max_x = (out_w - self.width as i32).max(0);
+        let max_y = (out_h - self.height as i32).max(0);
+        self.x = self.x.clamp(0, max_x);
+        self.y = self.y.clamp(0, max_y);
+    }
+
+    fn send_ready(&mut self) {
+        if self.ready_sent {
+            return;
+        }
+        self.ready_sent = true;
+        let output = self
+            .output
+            .as_ref()
+            .and_then(|output| self.output_state.info(output).and_then(|info| info.name));
+        self.writer.send(&HostEvent::Ready {
+            width: self.width,
+            height: self.height,
+            output,
+            scale: self.scale,
+        });
+    }
+
+    fn send_position(&self) {
+        self.writer.send(&HostEvent::Position {
+            x: self.x,
+            y: self.y,
+        });
+    }
+
+    fn send_pointer(
+        &self,
+        event: PointerEventName,
+        x: f64,
+        y: f64,
+        button: Option<u32>,
+        time: Option<u32>,
+    ) {
+        self.writer.send(&HostEvent::Pointer {
+            event,
+            x,
+            y,
+            button,
+            time,
+        });
+    }
+
+    fn stop(&mut self) {
+        if self.quit {
+            return;
+        }
+        self.quit = true;
+        self.signal.stop();
+    }
+}
+
+impl CompositorHandler for Overlay {
+    fn scale_factor_changed(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _surface: &wl_surface::WlSurface,
+        new_factor: i32,
+    ) {
+        self.scale = new_factor.max(1);
+    }
+
+    fn transform_changed(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _surface: &wl_surface::WlSurface,
+        _new_transform: wl_output::Transform,
+    ) {
+    }
+
+    fn frame(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _surface: &wl_surface::WlSurface,
+        _time: u32,
+    ) {
+    }
+
+    fn surface_enter(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _surface: &wl_surface::WlSurface,
+        output: &wl_output::WlOutput,
+    ) {
+        self.output = Some(output.clone());
+        if let Some(info) = self.output_state.info(output) {
+            if let Some((w, h)) = info.logical_size {
+                self.output_size = (w, h);
+            }
+            self.scale = info.scale_factor.max(1);
+            debug!(
+                "surface entered output {:?} size={:?}",
+                info.name, info.logical_size
+            );
+        }
+    }
+
+    fn surface_leave(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _surface: &wl_surface::WlSurface,
+        output: &wl_output::WlOutput,
+    ) {
+        if self.output.as_ref() == Some(output) {
+            self.output = None;
+        }
+    }
+}
+
+impl OutputHandler for Overlay {
+    fn output_state(&mut self) -> &mut OutputState {
+        &mut self.output_state
+    }
+
+    fn new_output(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_output::WlOutput) {}
+
+    fn update_output(
+        &mut self,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        output: wl_output::WlOutput,
+    ) {
+        if self.output.as_ref() == Some(&output) {
+            if let Some(info) = self.output_state.info(&output) {
+                if let Some((w, h)) = info.logical_size {
+                    self.output_size = (w, h);
+                }
+                self.scale = info.scale_factor.max(1);
+            }
+        }
+    }
+
+    fn output_destroyed(
+        &mut self,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        output: wl_output::WlOutput,
+    ) {
+        if self.output.as_ref() == Some(&output) {
+            self.output = None;
+        }
+    }
+}
+
+impl LayerShellHandler for Overlay {
+    fn closed(&mut self, _conn: &Connection, _qh: &QueueHandle<Self>, _layer: &LayerSurface) {
+        self.stop();
+    }
+
+    fn configure(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _layer: &LayerSurface,
+        configure: LayerSurfaceConfigure,
+        _serial: u32,
+    ) {
+        let (w, h) = configure.new_size;
+        if w > 0 && h > 0 && (w != self.width || h != self.height) {
+            self.resize(w, h);
+        }
+        if !self.ready_sent {
+            self.send_ready();
+        }
+        if self.visible {
+            self.draw();
+        }
+    }
+}
+
+impl SeatHandler for Overlay {
+    fn seat_state(&mut self) -> &mut SeatState {
+        &mut self.seat_state
+    }
+
+    fn new_seat(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat) {}
+
+    fn new_capability(
+        &mut self,
+        _conn: &Connection,
+        qh: &QueueHandle<Self>,
+        seat: wl_seat::WlSeat,
+        capability: Capability,
+    ) {
+        if capability == Capability::Pointer && self.pointer.is_none() {
+            match self.seat_state.get_pointer(qh, &seat) {
+                Ok(pointer) => {
+                    self.relative_pointer = self
+                        .relative_pointer_state
+                        .get_relative_pointer(&pointer, qh)
+                        .ok();
+                    if self.relative_pointer.is_none() {
+                        warn!("compositor does not support relative-pointer; drag will be limited");
+                    }
+                    self.pointer = Some(pointer);
+                }
+                Err(err) => warn!("failed to create pointer: {err}"),
+            }
+        }
+    }
+
+    fn remove_capability(
+        &mut self,
+        _conn: &Connection,
+        _: &QueueHandle<Self>,
+        _seat: wl_seat::WlSeat,
+        capability: Capability,
+    ) {
+        if capability == Capability::Pointer {
+            if let Some(pointer) = self.pointer.take() {
+                pointer.release();
+            }
+            self.relative_pointer = None;
+        }
+    }
+
+    fn remove_seat(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat) {}
+}
+
+impl PointerHandler for Overlay {
+    fn pointer_frame(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _pointer: &wl_pointer::WlPointer,
+        events: &[PointerEvent],
+    ) {
+        for event in events {
+            if &event.surface != self.layer.wl_surface() {
+                continue;
+            }
+            let (x, y) = event.position;
+            match event.kind {
+                PointerEventKind::Enter { .. } => {
+                    self.send_pointer(PointerEventName::Enter, x, y, None, None);
+                }
+                PointerEventKind::Leave { .. } => {
+                    self.send_pointer(PointerEventName::Leave, x, y, None, None);
+                    self.drag = None;
+                }
+                PointerEventKind::Motion { time } => {
+                    self.send_pointer(PointerEventName::Motion, x, y, None, Some(time));
+                }
+                PointerEventKind::Press { time, button, .. } => {
+                    self.send_pointer(PointerEventName::Down, x, y, Some(button), Some(time));
+                    if button == 0x110 {
+                        self.drag = Some(DragState {
+                            button,
+                            start_x: self.x,
+                            start_y: self.y,
+                            accum_x: 0.0,
+                            accum_y: 0.0,
+                            started: false,
+                        });
+                    }
+                }
+                PointerEventKind::Release { time, button, .. } => {
+                    if let Some(drag) = self.drag.take() {
+                        if drag.started && drag.button == button {
+                            self.writer.send(&HostEvent::Drag {
+                                phase: DragPhase::End,
+                                x: self.x,
+                                y: self.y,
+                            });
+                            self.send_position();
+                        }
+                    }
+                    self.send_pointer(PointerEventName::Up, x, y, Some(button), Some(time));
+                }
+                PointerEventKind::Axis {
+                    time,
+                    horizontal,
+                    vertical,
+                    ..
+                } => {
+                    self.send_pointer(PointerEventName::Axis, x, y, None, Some(time));
+                    let _ = (horizontal, vertical);
+                }
+            }
+        }
+    }
+}
+
+impl RelativePointerHandler for Overlay {
+    fn relative_pointer_motion(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _relative_pointer: &ZwpRelativePointerV1,
+        _pointer: &wl_pointer::WlPointer,
+        event: RelativeMotionEvent,
+    ) {
+        let Some(drag) = self.drag.as_mut() else {
+            return;
+        };
+        drag.accum_x += event.delta.0;
+        drag.accum_y += event.delta.1;
+
+        if !drag.started && (drag.accum_x.abs() >= 2.0 || drag.accum_y.abs() >= 2.0) {
+            drag.started = true;
+            self.writer.send(&HostEvent::Drag {
+                phase: DragPhase::Start,
+                x: self.x,
+                y: self.y,
+            });
+        }
+        if !drag.started {
+            return;
+        }
+
+        let (start_x, start_y, accum_x, accum_y) =
+            (drag.start_x, drag.start_y, drag.accum_x, drag.accum_y);
+        self.x = start_x + accum_x.round() as i32;
+        self.y = start_y + accum_y.round() as i32;
+        self.clamp_position();
+        self.apply_margins();
+        self.layer.commit();
+        self.writer.send(&HostEvent::Drag {
+            phase: DragPhase::Move,
+            x: self.x,
+            y: self.y,
+        });
+    }
+}
+
+impl ShmHandler for Overlay {
+    fn shm_state(&mut self) -> &mut Shm {
+        &mut self.shm
+    }
+}
+
+impl ProvidesRegistryState for Overlay {
+    fn registry(&mut self) -> &mut RegistryState {
+        &mut self.registry_state
+    }
+    registry_handlers![OutputState, SeatState];
+}
+
+impl Dispatch<wl_region::WlRegion, ()> for Overlay {
+    fn event(
+        _state: &mut Self,
+        _proxy: &wl_region::WlRegion,
+        _event: <wl_region::WlRegion as wayland_client::Proxy>::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+    ) {
+    }
+}
+
+delegate_compositor!(Overlay);
+delegate_output!(Overlay);
+delegate_shm!(Overlay);
+delegate_seat!(Overlay);
+delegate_pointer!(Overlay);
+delegate_relative_pointer!(Overlay);
+delegate_layer!(Overlay);
+delegate_registry!(Overlay);

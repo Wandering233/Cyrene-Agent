@@ -82,6 +82,14 @@ export class InteractionController {
     this.downHits = [];
   };
 
+  /**
+   * Cancel a pending click gesture. The native Wayland overlay calls this when
+   * a drag starts so dragging the pet does not also trigger a hit-area motion.
+   */
+  cancelClick(): void {
+    this.downHits = [];
+  }
+
   private resolveHits(x: number, y: number): HitAreaDef[] {
     const names = this.model.hitTest(x, y);
     if (!names || names.length === 0) return [];

@@ -15,6 +15,7 @@ import { CHAT_READY_TIMEOUT_MS, loadWindowForStartup } from "./startup-window-lo
 import { createMusicPlayerWindow } from "./create-music-player-window";
 import { broadcastToAllWindows } from "./broadcast";
 import { PetWindowMoveController } from "../pet-window-movement";
+import { getPetOverlay } from "../pet-overlay";
 import { hasCurrentDisclaimerConsent as isCurrentDisclaimerConsent } from "../../shared/disclaimer";
 
 const PET_WINDOW_RESOURCE_RELEASE_DELAY_MS = 30_000;
@@ -95,6 +96,10 @@ export function createWindowManager(options: WindowManagerOptions): WindowManage
   }
 
   function schedulePetWindowResourceRelease(window: BrowserWindow): void {
+    // The native overlay is a hidden offscreen window; its visibility is
+    // owned by the host process, not BrowserWindow. Keep it alive so the
+    // layer surface can be shown again instantly.
+    if (getPetOverlay(window)) return;
     cancelPetWindowResourceRelease();
     if (window.isDestroyed() || window.isVisible()) return;
     petWindowReleaseTimer = setTimeout(() => {
@@ -152,8 +157,9 @@ export function createWindowManager(options: WindowManagerOptions): WindowManage
     petWindow = window;
     window.once("ready-to-show", () => {
       if (petWindow !== window || window.isDestroyed()) return;
+      const overlay = getPetOverlay(window);
       if (showOnReady) {
-        window.show();
+        if (overlay) overlay.show(); else window.show();
       } else {
         schedulePetWindowResourceRelease(window);
       }
@@ -176,15 +182,57 @@ export function createWindowManager(options: WindowManagerOptions): WindowManage
     window.on("moved", () => {
       const win = petWindow;
       if (!win || win.isDestroyed()) return;
+      const overlay = getPetOverlay(win);
       try {
-        const [x, y] = win.getPosition();
+        const position = overlay ? overlay.getPosition() : (() => {
+          const [x, y] = win.getPosition();
+          return { x, y };
+        })();
         for (const handler of movedHandlers) {
-          try { handler({ x, y }); } catch (err) { console.error("[WindowManager] moved handler failed:", err); }
+          try { handler(position); } catch (err) { console.error("[WindowManager] moved handler failed:", err); }
         }
       } catch {
         // ignore
       }
     });
+    (window as unknown as { on(event: string, listener: (error: Error) => void): void }).on(
+      "pet-overlay-failed",
+      (error) => {
+        if (petWindow !== window) return;
+        console.error("[WindowManager] native pet overlay failed, falling back:", error);
+        window.destroy();
+        petWindow = null;
+        try {
+          const fallback = createPetWindowInstance(showOnReady, true);
+          const settings = options.loadPetWindowSettingsSlice();
+          const alwaysOnTop = settings.petAlwaysOnTop ?? true;
+          fallback.setAlwaysOnTop(alwaysOnTop, alwaysOnTop ? "screen-saver" : "normal");
+          if (showOnReady) fallback.show();
+        } catch (fallbackError) {
+          console.error("[WindowManager] pet fallback failed:", fallbackError);
+        }
+      },
+    );
+  }
+
+  function createPetWindowInstance(showOnReady = true, forceNormal = false): BrowserWindow {
+    if (petWindow && !petWindow.isDestroyed()) return petWindow;
+    const shouldShowOnReady = showOnReady && hasCurrentDisclaimerConsent();
+    const win = createPetWindow(
+      {
+        getCurrentAppIconPath: options.getCurrentAppIconPath,
+        isDev: options.isDev,
+        loadGeneralSettings: options.loadPetWindowSettingsSlice,
+      },
+      { showOnReady: shouldShowOnReady, forceNormal },
+    );
+    setPetWindow(win, shouldShowOnReady);
+    const settings = options.loadPetWindowSettingsSlice();
+    const alwaysOnTop = settings.petAlwaysOnTop ?? true;
+    const overlay = getPetOverlay(win);
+    if (overlay) overlay.setAlwaysOnTop(alwaysOnTop);
+    else win.setAlwaysOnTop(alwaysOnTop, alwaysOnTop ? "screen-saver" : "normal");
+    return win;
   }
 
   return {
@@ -195,21 +243,7 @@ export function createWindowManager(options: WindowManagerOptions): WindowManage
       onboardingWindow?.close();
     },
     createPetWindow(showOnReady = true): BrowserWindow {
-      if (petWindow && !petWindow.isDestroyed()) return petWindow;
-      const shouldShowOnReady = showOnReady && hasCurrentDisclaimerConsent();
-      const win = createPetWindow(
-        {
-          getCurrentAppIconPath: options.getCurrentAppIconPath,
-          isDev: options.isDev,
-          loadGeneralSettings: options.loadPetWindowSettingsSlice,
-        },
-        { showOnReady: shouldShowOnReady },
-      );
-      setPetWindow(win, shouldShowOnReady);
-      const settings = options.loadPetWindowSettingsSlice();
-      const alwaysOnTop = settings.petAlwaysOnTop ?? true;
-      win.setAlwaysOnTop(alwaysOnTop, alwaysOnTop ? "screen-saver" : "normal");
-      return win;
+      return createPetWindowInstance(showOnReady, false);
     },
 
     createReactChatWindowShell(): ReactChatWindowHandle {
@@ -275,14 +309,18 @@ export function createWindowManager(options: WindowManagerOptions): WindowManage
       }
       const win = getUsablePetWindow();
       if (win) {
-        win.show();
+        const overlay = getPetOverlay(win);
+        if (overlay) overlay.show(); else win.show();
         return;
       }
       // 窗口不存在（如被意外销毁）时兜底重建，保证托盘/设置永远能救回桌宠
       this.createPetWindow(true);
     },
     hidePetWindow(): void {
-      getUsablePetWindow()?.hide();
+      const win = getUsablePetWindow();
+      if (!win) return;
+      const overlay = getPetOverlay(win);
+      if (overlay) overlay.hide(); else win.hide();
     },
     togglePetWindow(): void {
       if (!hasCurrentDisclaimerConsent()) {
@@ -294,19 +332,40 @@ export function createWindowManager(options: WindowManagerOptions): WindowManage
         this.createPetWindow(true);
         return;
       }
-      win.isVisible() ? win.hide() : win.show();
+      const overlay = getPetOverlay(win);
+      const visible = overlay ? overlay.isVisible() : win.isVisible();
+      if (visible) {
+        if (overlay) overlay.hide(); else win.hide();
+      } else if (overlay) {
+        overlay.show();
+      } else {
+        win.show();
+      }
     },
     minimizePetWindow(): void {
-      getUsablePetWindow()?.minimize();
+      const win = getUsablePetWindow();
+      if (!win) return;
+      const overlay = getPetOverlay(win);
+      if (overlay) overlay.hide(); else win.minimize();
     },
     setPetWindowAlwaysOnTop(alwaysOnTop: boolean): void {
       const win = getUsablePetWindow();
       if (!win) return;
+      const overlay = getPetOverlay(win);
+      if (overlay) {
+        overlay.setAlwaysOnTop(alwaysOnTop);
+        return;
+      }
       win.setAlwaysOnTop(alwaysOnTop, alwaysOnTop ? "screen-saver" : "normal");
     },
     setPetWindowInteractive(interactive: boolean): void {
       const win = getUsablePetWindow();
       if (!win) return;
+      const overlay = getPetOverlay(win);
+      if (overlay) {
+        overlay.setInteractive(interactive);
+        return;
+      }
       // Linux/其它平台没有鼠标事件转发：忽略后无法通过 pointermove 再恢复交互，
       // 因此保持整窗可交互（透明边角会拦截点击，作为已知限制）。
       if (process.platform !== "win32" && process.platform !== "darwin") return;
@@ -315,6 +374,7 @@ export function createWindowManager(options: WindowManagerOptions): WindowManage
     setPetWindowDragging(isDragging: boolean): void {
       const win = getUsablePetWindow();
       if (!win) return;
+      if (getPetOverlay(win)) return;
       if (!isDragging) petWindowMoveController.finishDragging();
       try {
         win.setOpacity(isDragging ? 0.99 : 1.0);
@@ -323,14 +383,31 @@ export function createWindowManager(options: WindowManagerOptions): WindowManage
       }
     },
     movePetWindowRelative(dx: number, dy: number): void {
+      const win = getUsablePetWindow();
+      const overlay = getPetOverlay(win);
+      if (overlay) {
+        overlay.moveBy(dx, dy);
+        return;
+      }
       petWindowMoveController.moveRelative(dx, dy);
     },
     movePetWindowTo(x: number, y: number): void {
+      const win = getUsablePetWindow();
+      const overlay = getPetOverlay(win);
+      if (overlay) {
+        overlay.moveTo(x, y);
+        return;
+      }
       petWindowMoveController.queueAbsolute(x, y);
     },
     applyPetWindowZoom(zoom: number): void {
       const win = getUsablePetWindow();
       if (!win) return;
+      const overlay = getPetOverlay(win);
+      if (overlay) {
+        overlay.setZoom(zoom);
+        return;
+      }
       const width = Math.round(PET_WINDOW_BASE_WIDTH * zoom);
       const height = Math.round(PET_WINDOW_BASE_HEIGHT * zoom);
       win.setSize(width, height);
@@ -345,6 +422,15 @@ export function createWindowManager(options: WindowManagerOptions): WindowManage
     async capturePetWindow(): Promise<Electron.NativeImage | null> {
       const win = getUsablePetWindow();
       if (!win) return null;
+      const overlay = getPetOverlay(win);
+      if (overlay) {
+        try {
+          return await overlay.capturePage();
+        } catch (err) {
+          console.error("[WindowManager] capturePetWindow failed:", err);
+          return null;
+        }
+      }
       try {
         return await win.webContents.capturePage();
       } catch (err) {
@@ -372,7 +458,10 @@ export function createWindowManager(options: WindowManagerOptions): WindowManage
 
     onPetWindowReady(handler: (win: BrowserWindow) => void): void {
       readyHandlers.push(handler);
-      if (petWindow && !petWindow.isDestroyed() && petWindow.isVisible()) {
+      if (!petWindow || petWindow.isDestroyed()) return;
+      const overlay = getPetOverlay(petWindow);
+      const visible = overlay ? overlay.isVisible() : petWindow.isVisible();
+      if (visible) {
         try { handler(petWindow); } catch (err) { console.error("[WindowManager] ready handler failed:", err); }
       }
     },

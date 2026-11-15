@@ -84,6 +84,9 @@ nsis:
   uninstallerSidebar: build/installer/installer-sidebar.bmp
 linux:
   icon: assets/icon-presets/cyrene-sun.png
+  extraResources:
+    - from: resources/bin/linux/cyrene-overlay-host
+      to: bin/cyrene-overlay-host
   category: Utility
   synopsis: Live2D desktop AI companion
   description: Cyrene is a Live2D desktop AI companion built with Electron and TypeScript.

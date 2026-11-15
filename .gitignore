@@ -258,3 +258,7 @@ dist/renderer/cyrene-welcome.png
 /dist/renderer/learn-exam.html
 *.sqlite
 *.sqlite-*
+
+# Native Wayland overlay host (built with pnpm run build:overlay-host)
+resources/bin/linux/*
+!resources/bin/linux/.gitkeep

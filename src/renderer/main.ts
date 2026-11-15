@@ -27,8 +27,18 @@ if (!window.cyrene) {
     getCursorPosition: () => Promise.resolve(null),
     onPetZoom: (_cb: (zoom: number) => void) => () => {},
     onPetVisibilityChanged: (_cb: (visible: boolean) => void) => () => {},
+    petOverlayMode: false,
+    onPetOverlayDrag: (_cb: (payload: { phase: "start" | "end" }) => void) => () => {},
   };
 }
+
+/**
+ * In the native Wayland overlay the compositor owns click-through and the
+ * native host owns dragging. The renderer must not call window APIs that only
+ * make sense for a real BrowserWindow.
+ */
+const petOverlayMode = window.cyrene?.petOverlayMode === true;
+console.log("[Cyrene] pet overlay mode:", petOverlayMode);
 
 declare global {
   interface Window {
@@ -49,6 +59,7 @@ let blink: BlinkController | null = null;
 let clickThrough: ClickThroughController | null = null;
 let petZoomOff: (() => void) | null = null;
 let petVisibilityOff: (() => void) | null = null;
+let petOverlayDragOff: (() => void) | null = null;
 let petVisible = true;
 let live2dSpeechOffs: Array<() => void> = [];
 const live2dLifecycle = new Live2DRendererLifecycleTracker();
@@ -110,9 +121,11 @@ const manager = new Live2DManager({
     focus = new MouseFocusController(canvas, model);
     focus.focusCenter(true);
 
-    clickThrough = new ClickThroughController(canvas, manager, {
-      onInteractive: (interactive) => void window.cyrene.setInteractive(interactive),
-    });
+    if (!petOverlayMode) {
+      clickThrough = new ClickThroughController(canvas, manager, {
+        onInteractive: (interactive) => void window.cyrene.setInteractive(interactive),
+      });
+    }
 
     // Apply the persisted zoom on load and track future changes. The main
     // process has already resized the window to base × zoom; this rescales
@@ -132,6 +145,24 @@ const manager = new Live2DManager({
         clickThrough?.resume();
       }
     }));
+
+    if (petOverlayMode) {
+      petOverlayDragOff = trackSubscription(
+        "cyrene:onPetOverlayDrag",
+        window.cyrene.onPetOverlayDrag((payload) => {
+          if (payload.phase === "start") {
+            interaction?.cancelClick();
+            focus?.pause(true);
+            manager.pause();
+          } else {
+            if (petVisible) {
+              manager.resume();
+              focus?.resume();
+            }
+          }
+        }),
+      );
+    }
 
     // 启动竞态修复：主进程在渲染进程就绪前发的 PET_ZOOM 事件会被丢弃。
     // 注册监听后主动从磁盘读一次 petZoom 并应用，确保重启后模型大小生效。
@@ -195,6 +226,8 @@ window.addEventListener("beforeunload", () => {
   petZoomOff = null;
   petVisibilityOff?.();
   petVisibilityOff = null;
+  petOverlayDragOff?.();
+  petOverlayDragOff = null;
   interaction?.dispose();
   interaction = null;
   manager.dispose();
@@ -309,6 +342,10 @@ function finishDrag(): void {
   if (petVisible) clickThrough?.resume();
 }
 
+// In the native overlay the host owns drag and the compositor owns
+// click-through. The Windows/X11 path still needs the in-renderer drag and
+// alpha hit-testing below.
+if (!petOverlayMode) {
 // Click-through is driven per-pixel by ClickThroughController on pointermove.
 // We only need enter/leave to bookend the cursor's stay in the window:
 // entering hands control to the controller, leaving the window entirely
@@ -377,3 +414,4 @@ addTrackedEventListener(canvas, "canvas:pointerup", "pointerup", (e) => {
     event.clientY > rect.bottom;
   if (outside) void window.cyrene.setInteractive(false);
 });
+}

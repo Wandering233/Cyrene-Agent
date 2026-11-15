@@ -40,6 +40,7 @@ export const IPC = {
   WINDOW_CAPTURE_FRAME: "window:capture-frame",
   WINDOW_GET_CURSOR_POSITION: "window:get-cursor-position",
   PET_VISIBILITY_CHANGED: "pet:visibility-changed",
+  PET_OVERLAY_DRAG: "pet:overlay-drag",
   APP_QUIT: "app:quit",
 
   // GitHub 应用更新
