@@ -287,3 +287,66 @@ describe("validateScreenshotInsert", () => {
     });
   });
 });
+
+describe("Wayland capture backend", () => {
+  it("uses the injected capture backend for the chat button", async () => {
+    const client = {
+      start: vi.fn(),
+      ensureStarted: vi.fn(),
+      shutdown: vi.fn(),
+    } as unknown as ScreenshotHelperClient;
+    const sendInsert = vi.fn();
+    const capture = vi.fn(async () => ({
+      filePath: "/tmp/cyrene-test-screenshots/wayland.png",
+      width: 400,
+      height: 500,
+    }));
+    const service = createScreenshotService({
+      client,
+      sendInsert,
+      capture,
+      registerShortcut: () => true,
+      unregisterShortcut: () => {},
+      isAvailable: () => true,
+    });
+
+    await expect(service.startFromChatButton()).resolves.toEqual({ ok: true });
+    expect(capture).toHaveBeenCalledWith(true);
+    expect(client.start).not.toHaveBeenCalled();
+    expect(sendInsert).toHaveBeenCalledWith(expect.objectContaining({
+      filePath: "/tmp/cyrene-test-screenshots/wayland.png",
+      width: 400,
+      height: 500,
+      mime: "image/png",
+      hasAnnotations: false,
+    }));
+  });
+
+  it("captures and copies for the hotkey path", async () => {
+    const client = {
+      start: vi.fn(),
+      ensureStarted: vi.fn(),
+      shutdown: vi.fn(),
+    } as unknown as ScreenshotHelperClient;
+    const copyToClipboard = vi.fn();
+    const capture = vi.fn(async () => ({
+      filePath: "/tmp/wayland-hotkey.png",
+      width: 800,
+      height: 600,
+    }));
+    const service = createScreenshotService({
+      client,
+      sendInsert: vi.fn(),
+      capture,
+      copyToClipboard,
+      registerShortcut: () => true,
+      unregisterShortcut: () => {},
+      isAvailable: () => true,
+    });
+
+    await expect(service.startFromHotkey()).resolves.toEqual({ ok: true });
+    expect(capture).toHaveBeenCalledWith(false);
+    expect(copyToClipboard).toHaveBeenCalledWith("/tmp/wayland-hotkey.png");
+    expect(client.start).not.toHaveBeenCalled();
+  });
+});

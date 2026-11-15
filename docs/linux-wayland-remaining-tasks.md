@@ -65,14 +65,14 @@
 
 | ID | 状态 | 任务 | 核对证据/现状 | 剩余工作与验收 | 优先级 |
 |---|---|---|---|---|---|
-| SHOT-01 | ❌ | portal Screenshot v2 | 无 portal 代码；Linux helper 不存在即禁用 | `Screenshot` D-Bus + `interactive` | P0 |
-| SHOT-02 | ❌ | 全屏/区域/窗口截图 | 只有 Windows native helper | 三种目标；多屏 | P0 |
+| SHOT-01 | 🟡 | portal Screenshot v2 | 新增 `portal-screenshot.ts`（dbus-next、Response 订阅、URI 校验）；本机 Hyprland portal 非交互返回 2 | 其他 DE 实机；交互返回 0 验证 | P0 |
+| SHOT-02 | 🟡 | 全屏/区域/窗口截图 | Hyprland：grim 全屏实测、slurp 选择取消路径实测；区域选择成功待人工 | 窗口截图/多屏 | P0 |
 | SHOT-03 | ❌ | 标注 overlay | Windows helper 内置；Linux 无 | 全屏/逐屏 overlay、画笔、保存/复制 | P0 |
-| SHOT-04 | ❌ | 剪贴板/文件保存 | Linux 入口被禁用 | `clipboard.writeImage`、临时文件清理 | P0 |
+| SHOT-04 | 🟡 | 剪贴板/文件保存 | 截图写入 userData/screenshots（UUID）；热键路径使用 ClipboardItem 写剪贴板；未实机验证剪贴板 | 剪贴板实机、临时文件清理 | P0 |
 | SHOT-05 | ❌ | 多屏/HiDPI 截图 | 无 | 区域坐标、缩放换算 | P0 |
-| SHOT-06 | ❌ | DE 兜底 | 无 | Hyprland grim/slurp、KDE Spectacle、GNOME portal/DBus | P1 |
-| SHOT-07 | ❌ | 全局截图热键 | 依赖不可用的 helper + `globalShortcut` | 接 portal；失败回退 | P0 |
-| SHOT-08 | ❌ | 权限/隐私/临时文件 | 无 Linux 实现 | 权限提示、0600、清理、不上传 | P1 |
+| SHOT-06 | 🟡 | DE 兜底 | Hyprland grim/slurp 已实现；其他 DE 走 portal | KDE Spectacle/GNOME DBus、grim 缺失回退 | P1 |
+| SHOT-07 | 🟡 | 全局截图热键 | Linux 已注册 `globalShortcut`，热键路径调用 grim 全屏；Wayland portal 触发未验证 | portal GlobalShortcuts 或桌面快捷键 | P0 |
+| SHOT-08 | 🟡 | 权限/隐私/临时文件 | 文件在 userData/screenshots，UUID 命名；portal 原文件未清理 | 0600、清理、权限提示 | P1 |
 | TOAST-01 | ❌ | Toast 使用原生 overlay host | `toast-window.ts` 仍是普通 BrowserWindow | 复用 offscreen + host | P0 |
 | TOAST-02 | ❌ | Toast 光标/角落定位 | `setBounds` 在原生 Wayland 无效；光标 0,0 | 宿主定位或系统通知 | P0 |
 | TOAST-03 | ❌ | Toast 穿透/点击 | 普通窗口整窗可交互 | input region | P0 |

@@ -22,6 +22,9 @@ export interface ScreenshotService {
 export interface ScreenshotServiceDeps {
   client: ScreenshotHelperClient;
   sendInsert(data: ScreenshotInsertData): void;
+  /** Wayland/Linux native capture backend; mutually exclusive with the Windows helper. */
+  capture?(interactive: boolean): Promise<{ filePath: string; width: number; height: number }>;
+  copyToClipboard?(filePath: string): void;
   registerShortcut(accelerator: string, callback: () => void): boolean;
   unregisterShortcut(accelerator: string): void;
   /** 原生 helper 是否可用；缺省视为可用（保持既有行为）。 */
@@ -80,6 +83,15 @@ export function createScreenshotService(deps: ScreenshotServiceDeps): Screenshot
 
   const startFromHotkey = async (): Promise<{ ok: boolean; reason?: string }> => {
     if (!isAvailable()) return { ok: false, reason: "SCREENSHOT_HELPER_UNAVAILABLE" };
+    if (deps.capture) {
+      try {
+        const result = await deps.capture(false);
+        deps.copyToClipboard?.(result.filePath);
+        return { ok: true };
+      } catch (error) {
+        return { ok: false, reason: reasonFrom(error) };
+      }
+    }
     try {
       await deps.client.start("clipboard-only", "hotkey");
       return { ok: true };
@@ -92,6 +104,22 @@ export function createScreenshotService(deps: ScreenshotServiceDeps): Screenshot
     sendInsert: (data: ScreenshotInsertData) => void = deps.sendInsert,
   ): Promise<{ ok: boolean; reason?: string }> => {
     if (!isAvailable()) return { ok: false, reason: "SCREENSHOT_HELPER_UNAVAILABLE" };
+    if (deps.capture) {
+      try {
+        const result = await deps.capture(true);
+        sendInsert({
+          filePath: result.filePath,
+          width: result.width,
+          height: result.height,
+          mime: "image/png",
+          previewUrl: pathToFileURL(result.filePath).toString(),
+          hasAnnotations: false,
+        });
+        return { ok: true };
+      } catch (error) {
+        return { ok: false, reason: reasonFrom(error) };
+      }
+    }
     try {
       const result = await deps.client.start("clipboard-and-file", "chat-button");
       if (!result.filePath) {
@@ -149,7 +177,7 @@ export function createScreenshotService(deps: ScreenshotServiceDeps): Screenshot
       replaceHotkey(initialHotkey);
     },
     async prewarm() {
-      if (!isAvailable()) return;
+      if (!isAvailable() || deps.capture) return;
       try {
         await deps.client.ensureStarted();
       } catch (error) {

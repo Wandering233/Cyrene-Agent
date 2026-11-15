@@ -1,12 +1,13 @@
 import * as path from "node:path";
 import * as fs from "fs";
 import { spawn } from "node:child_process";
-import { app, BrowserWindow, globalShortcut, nativeImage } from "electron";
+import { app, BrowserWindow, ClipboardItem, clipboard, globalShortcut, nativeImage } from "electron";
 import { randomUUID } from "crypto";
 import { IPC } from "../../shared/ipc-channels";
 import { createIpcScope, type IpcScope } from "../application/ipc-scope";
 import { ElectronScreenshotHelperClient } from "./helper-client";
 import { resolveScreenshotHelperPath } from "./helper-path";
+import { captureLinuxScreenshot } from "./linux-screenshot";
 import {
   createScreenshotService,
   validateScreenshotInsert,
@@ -104,6 +105,22 @@ export function initializeScreenshotService(
       return false;
     }
   };
+  const useLinuxCapture = process.platform === "linux"
+    && (process.env.XDG_SESSION_TYPE === "wayland" || Boolean(process.env.WAYLAND_DISPLAY));
+  const capture = useLinuxCapture
+    ? async (interactive: boolean) => {
+      const filePath = await captureLinuxScreenshot({
+        interactive,
+        outputDirectory: screenshotDirectory,
+      });
+      const image = nativeImage.createFromPath(filePath);
+      const size = image.getSize();
+      if (image.isEmpty() || size.width <= 0 || size.height <= 0) {
+        throw new Error("SCREENSHOT_INVALID_IMAGE");
+      }
+      return { filePath, width: size.width, height: size.height };
+    }
+    : undefined;
   const client = new ElectronScreenshotHelperClient({
     spawnImpl: (command, args) =>
       spawn(command, args, {
@@ -120,7 +137,18 @@ export function initializeScreenshotService(
 
   const service = createScreenshotService({
     client,
-    isAvailable: isHelperAvailable,
+    capture,
+    copyToClipboard: (filePath) => {
+      try {
+        const png = fs.readFileSync(filePath);
+        void clipboard.write([
+          new ClipboardItem({ "image/png": new Blob([png], { type: "image/png" }) }),
+        ]);
+      } catch (error) {
+        console.warn("[Screenshot] failed to copy image to clipboard:", error);
+      }
+    },
+    isAvailable: () => (useLinuxCapture ? true : isHelperAvailable()),
     registerShortcut: (accelerator, callback) =>
       globalShortcut.register(accelerator, callback),
     unregisterShortcut: (accelerator) => globalShortcut.unregister(accelerator),
@@ -164,11 +192,13 @@ export function initializeScreenshotService(
     return outPath;
   });
 
-  if (!isHelperAvailable()) {
+  if (!useLinuxCapture && !isHelperAvailable()) {
     console.warn(
       "[Screenshot] 原生截图助手不可用，截图热键与聊天截图入口已禁用:",
       resolveHelperPath(),
     );
+  } else if (useLinuxCapture) {
+    console.log("[Screenshot] Linux Wayland backend: grim/slurp (Hyprland) or xdg-desktop-portal");
   }
   service.init(options.initialHotkey);
   return service;
