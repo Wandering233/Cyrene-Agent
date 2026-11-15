@@ -33,11 +33,13 @@ interface CreateAppUpdateServiceOptions {
   updater: AppUpdaterLike;
   currentVersion: string;
   isPackaged: boolean;
+  supported?: boolean;
   onStateChanged?: (state: AppUpdateState) => void;
 }
 
 export function createAppUpdateService(options: CreateAppUpdateServiceOptions): AppUpdateService {
   const { updater, currentVersion, isPackaged, onStateChanged } = options;
+  const supported = options.supported ?? true;
   let state: AppUpdateState = { phase: "idle", currentVersion };
   let checkPromise: Promise<unknown> | null = null;
   let downloadPromise: Promise<unknown> | null = null;
@@ -93,6 +95,10 @@ export function createAppUpdateService(options: CreateAppUpdateServiceOptions): 
         publish({ phase: "not_available" });
         return { ...state };
       }
+      if (!supported) {
+        publish({ phase: "error", error: "unsupported" });
+        return { ...state };
+      }
       if (!checkPromise) {
         publish({ phase: "checking" });
         checkPromise = updater.checkForUpdates().catch(() => {
@@ -106,6 +112,7 @@ export function createAppUpdateService(options: CreateAppUpdateServiceOptions): 
     },
     async download() {
       if (!isPackaged) return { ...state };
+      if (!supported) return { ...state };
       if (!downloadPromise && state.phase !== "downloaded") {
         publish({ phase: "downloading", percent: state.percent ?? 0 });
         downloadPromise = updater.downloadUpdate().catch(() => {
@@ -118,7 +125,7 @@ export function createAppUpdateService(options: CreateAppUpdateServiceOptions): 
       return { ...state };
     },
     canInstall() {
-      return isPackaged && state.phase === "downloaded";
+      return supported && isPackaged && state.phase === "downloaded";
     },
     install() {
       if (!this.canInstall()) return false;

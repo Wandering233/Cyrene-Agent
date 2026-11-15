@@ -91,6 +91,12 @@ describe("resolveAppUpdateView", () => {
     expect(resolveAppUpdateView({
       phase: "error",
       currentVersion: "1.1.7",
+      error: "unsupported",
+    })).toMatchObject({ label: { key: "appUpdate.error.unsupported" } });
+
+    expect(resolveAppUpdateView({
+      phase: "error",
+      currentVersion: "1.1.7",
       error: "something_new",
     })).toMatchObject({ label: { key: "appUpdate.error.default" } });
   });

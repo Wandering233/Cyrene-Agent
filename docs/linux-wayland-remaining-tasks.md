@@ -99,9 +99,9 @@
 | AUTO-02 | ✅ | AppImage/目录版路径 | 打包版写入的 Exec 指向 `release/linux-unpacked/cyrene` | AppImage 实机仍是待验 | P0 |
 | AUTO-03 | ✅ | `--autostart` 静默启动 | 打包版 `--autostart` 实测只显示桌宠/overlay，不显示聊天窗 | 已验收 | P0 |
 | AUTO-04 | ✅ | 设置与文件同步/测试 | `launch-at-login.test.ts` 覆盖写入/移除/AppImage 转义/dev 跳过 | 路径失效实机验证 | P1 |
-| UPD-01 | ❌ | AppImage 更新 feed | `github-app-updater` 只按 NSIS 假设 | `latest-linux.yml`、AppImage feed | P0 |
+| UPD-01 | 🟡 | AppImage 更新 feed | electron-builder 已配置 GitHub publish + AppImage target；更新服务已加 AppImage 检测 | 实际生成/上传 `latest-linux.yml` 并实机更新 | P0 |
 | UPD-02 | ❌ | Linux release 资产 | electron-builder 有 Linux target，无发布流程 | GitHub Release 上传 AppImage/tar.gz/yml | P0 |
-| UPD-03 | ❌ | `APPIMAGE` 检测/手动更新 | 无 | tar.gz/deb 显示手动更新 | P0 |
+| UPD-03 | ✅ | `APPIMAGE` 检测/手动更新 | 打包 Linux 无 `APPIMAGE` 时更新状态为 `error: unsupported`，UI 已加中/英/日文案；AppImage 才启用 | 已验收 | P0 |
 | UPD-04 | ❌ | 更新签名/校验 | 无 Linux 签名 | minisign/GPG 或 sha512 + 文档 | P1 |
 | UPD-05 | ❌ | Electron/宿主原子更新 | 宿主随包更新，无版本校验 | 协议版本/宿主版本绑定 | P1 |
 | UPD-06 | ❌ | 回滚/旧版本保留 | 无 | 失败回滚、保留上一版 | P2 |

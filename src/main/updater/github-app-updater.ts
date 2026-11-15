@@ -2,6 +2,7 @@ import * as path from "node:path";
 import { app } from "electron";
 import { autoUpdater } from "electron-updater";
 import { createAppUpdateService, type AppUpdateService, type AppUpdaterLike } from "./app-update-service";
+import { isLinuxAppImageUpdateSupported } from "./linux-update-support";
 
 export function createGitHubAppUpdateService(options: {
   currentVersion: string;
@@ -16,6 +17,7 @@ export function createGitHubAppUpdateService(options: {
     updater: autoUpdater as unknown as AppUpdaterLike,
     currentVersion: options.currentVersion,
     isPackaged: options.isPackaged,
+    supported: isLinuxAppImageUpdateSupported({ isPackaged: options.isPackaged }),
   });
 }
 

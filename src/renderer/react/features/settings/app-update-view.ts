@@ -21,7 +21,7 @@ export interface AppUpdateView {
 }
 
 /** 主进程已知的错误码；未知码按通用失败文案兜底 */
-const KNOWN_ERROR_CODES = new Set(["check_failed", "download_failed"]);
+const KNOWN_ERROR_CODES = new Set(["check_failed", "download_failed", "unsupported"]);
 
 export function resolveAppUpdateView(state: AppUpdateState): AppUpdateView {
   switch (state.phase) {

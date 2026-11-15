@@ -775,6 +775,7 @@
     "retryAction": "Retry",
     "restartAction": "Restart & update",
     "error": {
+      "unsupported": "In-app updates are not available for this installation. Please update via your package manager or installer.",
       "check_failed": "Couldn't check for updates right now. Please try again later.",
       "download_failed": "Update download failed. Please try again later.",
       "default": "Something went wrong with updates. Please try again later."
