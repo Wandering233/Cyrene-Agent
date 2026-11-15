@@ -12,6 +12,8 @@ export interface RevealStartupWindowsOptions {
   /** 首次启动时展示的独立欢迎窗口；提供时可取代聊天窗口作为首次可见窗口。 */
   onboardingWindow?: StartupWindowLike | null;
   showOnboardingWindow?: boolean;
+  /** 开机自启时保持聊天窗口隐藏，只显示桌宠/托盘。 */
+  suppressChatWindow?: boolean;
   /** Loading 实际 show() 的单调时钟时刻；undefined 表示未记录（跳过最短等待）。 */
   loadingShownAt?: number;
   minimumDurationMs: number;
@@ -45,7 +47,7 @@ export async function revealStartupWindows(options: RevealStartupWindowsOptions)
   }
   if (options.showOnboardingWindow && options.onboardingWindow && !options.onboardingWindow.isDestroyed()) {
     options.onboardingWindow.show();
-  } else if (!options.chatWindow.isDestroyed()) {
+  } else if (!options.suppressChatWindow && !options.chatWindow.isDestroyed()) {
     options.chatWindow.show();
   }
 }

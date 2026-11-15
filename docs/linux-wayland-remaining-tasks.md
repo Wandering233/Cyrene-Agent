@@ -2,7 +2,8 @@
 
 > 基线：`e42a45b4 feat(跨平台): 增加 Linux Wayland 原生桌宠 overlay`
 > 环境：Arch Linux + Hyprland 0.57.1 + Wayland，Electron 44.7.2
-> 说明：本文是**全量任务清单与逐项核对结果**，不代表这些任务已经实现。
+> 说明：本文是**全量任务清单与逐项核对结果**；已完成项会随实现更新。
+> 最近更新：XDG autostart / `--autostart` 静默启动（打包实机验证）；overlay 按 `init.output` 选择输出（单屏验证）。
 
 ## 状态图例
 
@@ -35,7 +36,7 @@
 | OVL-03 | ❌ | GNOME 全屏态副作用 | 无 GNOME 检测/处理 | 顶栏、概览、全屏提示、idle inhibit 验证 | P0 |
 | OVL-04 | ❌ | HiDPI buffer scale | `scale` 只记录，没有 `set_buffer_scale` | 按输出 scale 渲染物理像素；坐标换算 | P0 |
 | OVL-05 | ❌ | 分数缩放 1.25/1.5 | 坐标全按逻辑像素 | 缩放/位置/输入区域换算测试 | P0 |
-| OVL-06 | ❌ | 按 `init.output` 选择输出 | `output` 只 `debug!`，未用于 `create_layer_surface` | 按输出名创建 surface | P0 |
+| OVL-06 | ✅ | 按 `init.output` 选择输出 | 已实现名称匹配 + layer surface 重建；实测 `switched overlay to output HDMI-A-1` | 多屏互切归 OVL-07/27 | P0 |
 | OVL-07 | ❌ | 多屏热插拔/位置持久化 | 位置是全局 x/y，未绑定输出 | 输出移除/重连/位置恢复 | P0 |
 | OVL-08 | ❌ | 跨输出拖拽 | 拖拽只改 margin，不换输出 | 跨屏 surface 迁移/坐标重算 | P1 |
 | OVL-09 | 🟡 | `petAlwaysOnTop=false` 语义 | 已能切 `TOP`/`OVERLAY`，但关闭仍是 `TOP` | 普通层级模式或明确文档化限制 | P1 |
@@ -94,10 +95,10 @@
 
 | ID | 状态 | 任务 | 核对证据/现状 | 剩余工作与验收 | 优先级 |
 |---|---|---|---|---|---|
-| AUTO-01 | ❌ | XDG autostart | `syncLaunchAtLogin` 只调 `setLoginItemSettings` | 写 `~/.config/autostart/*.desktop` | P0 |
-| AUTO-02 | ❌ | AppImage/目录版路径 | 无 Linux 分支 | `$APPIMAGE` / `process.execPath` | P0 |
-| AUTO-03 | ❌ | `--autostart` 静默启动 | 无参数处理 | 不弹聊天窗，只显示桌宠/托盘 | P0 |
-| AUTO-04 | ❌ | 设置与文件同步/测试 | 只有 Windows 测试 | enable/disable/路径失效测试 | P1 |
+| AUTO-01 | ✅ | XDG autostart | 打包版以临时 `XDG_CONFIG_HOME` 实测写入/移除 `autostart/cyrene.desktop` | 已验收 | P0 |
+| AUTO-02 | ✅ | AppImage/目录版路径 | 打包版写入的 Exec 指向 `release/linux-unpacked/cyrene` | AppImage 实机仍是待验 | P0 |
+| AUTO-03 | ✅ | `--autostart` 静默启动 | 打包版 `--autostart` 实测只显示桌宠/overlay，不显示聊天窗 | 已验收 | P0 |
+| AUTO-04 | ✅ | 设置与文件同步/测试 | `launch-at-login.test.ts` 覆盖写入/移除/AppImage 转义/dev 跳过 | 路径失效实机验证 | P1 |
 | UPD-01 | ❌ | AppImage 更新 feed | `github-app-updater` 只按 NSIS 假设 | `latest-linux.yml`、AppImage feed | P0 |
 | UPD-02 | ❌ | Linux release 资产 | electron-builder 有 Linux target，无发布流程 | GitHub Release 上传 AppImage/tar.gz/yml | P0 |
 | UPD-03 | ❌ | `APPIMAGE` 检测/手动更新 | 无 | tar.gz/deb 显示手动更新 | P0 |
@@ -145,7 +146,7 @@
 **一轮完成全部 60+ 项不现实**（涉及 GNOME/Mutter、HiDPI、多屏、截图、portal、沙箱、打包发布和多个发行版实机）。建议按以下批次推进：
 
 ### Batch 1：核心可用性（约 2–3 周）
-OVL-01/02/03（GNOME fallback）、OVL-04/05（HiDPI）、OVL-06/07（多屏）、OVL-27（KDE/Sway/GNOME E2E）、SHOT-01/02/03/04/07（portal 截图）、TRAY-01/02、AUTO-01/02/03。
+OVL-01/02/03（GNOME fallback）、OVL-04/05（HiDPI）、OVL-07（多屏热插拔）、OVL-27（KDE/Sway/GNOME E2E）、SHOT-01/02/03/04/07（portal 截图）、TRAY-01/02。
 
 ### Batch 2：产品化（约 2–3 周）
 GS-01/02/03、FOCUS-01/02、TOAST-01/02/03、UPD-01/02/03、SBX-01/02/04、OVL-11/12、QA-01/02/07。

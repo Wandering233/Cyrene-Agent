@@ -89,6 +89,21 @@ export function createPetWindow(
     restoreY = Math.round(wa.y + (wa.height - petHeight) / 2);
   }
 
+  const targetDisplay = screen.getDisplayMatching({
+    x: restoreX,
+    y: restoreY,
+    width: petWidth,
+    height: petHeight,
+  });
+  // Electron's Wayland display label is often "(HDMI-A-1)"; layer-shell
+  // expects the bare wl_output name.
+  const rawDisplayLabel = typeof targetDisplay.label === "string"
+    ? targetDisplay.label.trim()
+    : "";
+  const outputLabel = rawDisplayLabel
+    ? rawDisplayLabel.replace(/^\((.*)\)$/, "$1")
+    : undefined;
+
   if (!options.forceNormal && shouldUsePetOverlay()) {
     try {
       const overlay = createPetOverlayWindow({
@@ -100,6 +115,7 @@ export function createPetWindow(
         zoom,
         alwaysOnTop: settings.petAlwaysOnTop ?? true,
         showOnReady,
+        output: outputLabel,
       });
       if (overlay) {
         console.log("[Cyrene] using native Wayland pet overlay host");

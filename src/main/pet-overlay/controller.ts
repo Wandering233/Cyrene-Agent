@@ -20,6 +20,8 @@ export interface PetOverlayControllerOptions {
   zoom: number;
   alwaysOnTop: boolean;
   showOnReady: boolean;
+  /** Output name (e.g. HDMI-A-1) selected by Electron; empty/undefined = compositor default. */
+  output?: string;
 }
 
 interface LatestFrame {
@@ -219,6 +221,7 @@ export class PetOverlayController {
       height: this.height,
       x: this.x,
       y: this.y,
+      output: this.options.output,
     });
     this.host.sendControl({
       type: "layer",

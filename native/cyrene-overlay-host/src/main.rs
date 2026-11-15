@@ -283,8 +283,9 @@ fn run(reader_stream: UnixStream, writer: EventWriter) -> Result<()> {
         shm,
         qh,
         compositor,
-        _layer_shell: layer_shell,
+        layer_shell,
         layer,
+        layer_kind: Layer::Top,
         pool,
         buffers,
         width: DEFAULT_WIDTH,
@@ -365,8 +366,9 @@ struct Overlay {
     shm: Shm,
     qh: QueueHandle<Overlay>,
     compositor: CompositorState,
-    _layer_shell: LayerShell,
+    layer_shell: LayerShell,
     layer: LayerSurface,
+    layer_kind: Layer,
     pool: SlotPool,
     buffers: Vec<Buffer>,
     width: u32,
@@ -428,6 +430,9 @@ impl Overlay {
                 self.apply_margins();
                 self.layer.commit();
                 self.send_position();
+                if let Some(output) = output {
+                    self.switch_output(&output);
+                }
                 if !self.ready_sent {
                     self.send_ready();
                 }
@@ -475,6 +480,7 @@ impl Overlay {
                         return;
                     }
                 };
+                self.layer_kind = target;
                 self.layer.set_layer(target);
                 self.layer.commit();
             }
@@ -633,6 +639,53 @@ impl Overlay {
         let max_y = (out_h - self.height as i32).max(0);
         self.x = self.x.clamp(0, max_x);
         self.y = self.y.clamp(0, max_y);
+    }
+
+    fn switch_output(&mut self, name: &str) {
+        if name.is_empty() {
+            return;
+        }
+        let target = self.output_state.outputs().find(|output| {
+            self.output_state
+                .info(output)
+                .and_then(|info| info.name)
+                .as_deref()
+                == Some(name)
+        });
+        let Some(output) = target else {
+            warn!("requested output {name:?} not found; keeping current output");
+            return;
+        };
+        if self.output.as_ref() == Some(&output) {
+            return;
+        }
+
+        let surface = self.compositor.create_surface(&self.qh);
+        let layer = self.layer_shell.create_layer_surface(
+            &self.qh,
+            surface,
+            self.layer_kind,
+            Some("cyrene-overlay"),
+            Some(&output),
+        );
+        layer.set_anchor(Anchor::TOP | Anchor::LEFT);
+        layer.set_keyboard_interactivity(KeyboardInteractivity::None);
+        layer.set_exclusive_zone(-1);
+        layer.set_size(self.width, self.height);
+        layer.set_margin(self.y, 0, 0, self.x);
+        layer.commit();
+
+        self.layer = layer;
+        self.output = Some(output.clone());
+        if let Some(info) = self.output_state.info(&output) {
+            if let Some((w, h)) = info.logical_size {
+                self.output_size = (w, h);
+            }
+            self.scale = info.scale_factor.max(1);
+        }
+        self.region_valid = false;
+        self.latest = None;
+        info!("switched overlay to output {name}");
     }
 
     fn send_ready(&mut self) {

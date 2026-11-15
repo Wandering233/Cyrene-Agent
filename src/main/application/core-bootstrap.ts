@@ -13,6 +13,7 @@ import type { ShutdownCoordinator } from "./shutdown";
 import type { WindowActivationBroker } from "./window-activation";
 import type { ShellResult } from "./shell-bootstrap";
 import type { RevealStartupWindowsOptions } from "../startup/startup-window-reveal";
+import { isAutostartLaunch } from "../startup/autostart-args";
 import type { AgentRuntime } from "../orchestrator/agent-runtime";
 import type { RuntimeStateService } from "../orchestrator/runtime-state-service";
 import type { TtsSynthesisService } from "../services/tts/tts-synthesis-service";
@@ -281,6 +282,7 @@ export async function startCore(deps: CoreDependencies): Promise<CoreResult> {
       showOnboardingWindow: !disclaimerAccepted,
       loadingShownAt: shell.loadingShownAt,
       minimumDurationMs: deps.minimumSplashMs,
+      suppressChatWindow: isAutostartLaunch(),
       isStopping: () => shutdown.isStopping(),
     });
     checkStartupActive(shutdown);

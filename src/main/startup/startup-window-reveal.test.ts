@@ -98,3 +98,38 @@ it("does not reveal windows after shutdown begins during minimum splash delay", 
   // Window shutdown owns closing, reveal does not fight it.
   expect(splashWindow.state.destroyed).toBe(false);
 });
+
+describe("autostart reveal", () => {
+  it("closes Loading without showing the chat window", async () => {
+    const splashWindow = createFakeWindow(true);
+    const chatWindow = createFakeWindow(false);
+
+    await revealStartupWindows({
+      splashWindow,
+      chatWindow,
+      suppressChatWindow: true,
+      minimumDurationMs: 0,
+    });
+
+    expect(splashWindow.state.destroyed).toBe(true);
+    expect(chatWindow.state.visible).toBe(false);
+  });
+
+  it("still shows onboarding on a first autostart launch", async () => {
+    const splashWindow = createFakeWindow(true);
+    const chatWindow = createFakeWindow(false);
+    const onboardingWindow = createFakeWindow(false);
+
+    await revealStartupWindows({
+      splashWindow,
+      chatWindow,
+      onboardingWindow,
+      showOnboardingWindow: true,
+      suppressChatWindow: true,
+      minimumDurationMs: 0,
+    });
+
+    expect(onboardingWindow.state.visible).toBe(true);
+    expect(chatWindow.state.visible).toBe(false);
+  });
+});
