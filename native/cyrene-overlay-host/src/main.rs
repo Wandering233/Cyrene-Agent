@@ -291,6 +291,9 @@ fn run(reader_stream: UnixStream, writer: EventWriter) -> Result<()> {
         buffers,
         width: DEFAULT_WIDTH,
         height: DEFAULT_HEIGHT,
+        buffer_width: DEFAULT_WIDTH,
+        buffer_height: DEFAULT_HEIGHT,
+        buffer_scale: 1,
         x: 100,
         y: 100,
         visible: false,
@@ -374,6 +377,9 @@ struct Overlay {
     buffers: Vec<Buffer>,
     width: u32,
     height: u32,
+    buffer_width: u32,
+    buffer_height: u32,
+    buffer_scale: i32,
     x: i32,
     y: i32,
     visible: bool,
@@ -417,6 +423,7 @@ impl Overlay {
         match control {
             Control::Init {
                 protocol,
+                scale,
                 width,
                 height,
                 x,
@@ -435,9 +442,12 @@ impl Overlay {
                         return;
                     }
                 }
-                debug!("init {width}x{height} at ({x},{y}) output={output:?}");
+                debug!("init {width}x{height} scale={scale:?} at ({x},{y}) output={output:?}");
                 self.x = x;
                 self.y = y;
+                if let Some(scale) = scale {
+                    self.buffer_scale = scale.max(1);
+                }
                 self.resize(width, height);
                 self.clamp_position();
                 self.apply_margins();
@@ -502,11 +512,31 @@ impl Overlay {
     }
 
     fn resize(&mut self, width: u32, height: u32) {
-        if width == 0 || height == 0 || (width == self.width && height == self.height) {
+        if width == 0 || height == 0 {
+            return;
+        }
+        let scale = self.buffer_scale.max(1) as u32;
+        let buffer_width = width.saturating_mul(scale);
+        let buffer_height = height.saturating_mul(scale);
+        if width == self.width
+            && height == self.height
+            && buffer_width == self.buffer_width
+            && buffer_height == self.buffer_height
+        {
             return;
         }
         self.width = width;
         self.height = height;
+        self.buffer_width = buffer_width;
+        self.buffer_height = buffer_height;
+        info!(
+            "resize {}x{} logical -> {}x{} buffer (scale {})",
+            self.width, self.height, self.buffer_width, self.buffer_height, self.buffer_scale
+        );
+        self.layer.set_size(self.width, self.height);
+        self.layer
+            .wl_surface()
+            .set_buffer_scale(self.buffer_scale.max(1));
         match self.reset_pool() {
             Ok(()) => {
                 self.latest = None;
@@ -526,9 +556,9 @@ impl Overlay {
         // Drop buffers before replacing the pool: Buffer holds a Slot that
         // points into the old pool's memory.
         self.buffers.clear();
-        self.pool = SlotPool::new(pool_size(self.width, self.height), &self.shm)
+        self.pool = SlotPool::new(pool_size(self.buffer_width, self.buffer_height), &self.shm)
             .context("resize shm pool")?;
-        self.buffers = create_buffers(&mut self.pool, self.width, self.height)?;
+        self.buffers = create_buffers(&mut self.pool, self.buffer_width, self.buffer_height)?;
         Ok(())
     }
 
@@ -536,10 +566,18 @@ impl Overlay {
         if header.width == 0 || header.height == 0 {
             return;
         }
-        if header.width != self.width || header.height != self.height {
-            self.resize(header.width, header.height);
-            self.layer.set_size(self.width, self.height);
-            self.layer.commit();
+        if header.width != self.buffer_width || header.height != self.buffer_height {
+            warn!(
+                "frame {}x{} does not match buffer {}x{} (logical {}x{} scale {})",
+                header.width,
+                header.height,
+                self.buffer_width,
+                self.buffer_height,
+                self.width,
+                self.height,
+                self.buffer_scale
+            );
+            return;
         }
         self.latest = Some((header, pixels));
         if self.visible {
@@ -556,15 +594,15 @@ impl Overlay {
         let Some((header, pixels)) = self.latest.as_ref() else {
             return;
         };
-        if header.width != self.width || header.height != self.height {
+        if header.width != self.buffer_width || header.height != self.buffer_height {
             return;
         }
 
         let mut attached = false;
         {
             let pool = &mut self.pool;
-            let width = self.width as usize;
-            let height = self.height as usize;
+            let width = self.buffer_width as usize;
+            let height = self.buffer_height as usize;
             let stride = header.stride as usize;
             if stride < width * 4 || pixels.len() < stride * height {
                 return;
@@ -583,9 +621,12 @@ impl Overlay {
                 if buffer.attach_to(self.layer.wl_surface()).is_err() {
                     continue;
                 }
-                self.layer
-                    .wl_surface()
-                    .damage(0, 0, self.width as i32, self.height as i32);
+                self.layer.wl_surface().damage_buffer(
+                    0,
+                    0,
+                    self.buffer_width as i32,
+                    self.buffer_height as i32,
+                );
                 self.layer.commit();
                 attached = true;
                 break;
@@ -613,6 +654,7 @@ impl Overlay {
             return;
         }
 
+        let scale = self.buffer_scale.max(1);
         let rects = match self.latest.as_ref() {
             Some((header, pixels)) => alpha_rects(
                 pixels,
@@ -620,8 +662,16 @@ impl Overlay {
                 header.height,
                 header.stride as usize,
                 INPUT_ALPHA_THRESHOLD,
-                INPUT_REGION_CELL,
-            ),
+                INPUT_REGION_CELL * scale as u32,
+            )
+            .into_iter()
+            .map(|rect| Rect {
+                x: rect.x / scale,
+                y: rect.y / scale,
+                width: ((rect.width + scale - 1) / scale).max(1),
+                height: ((rect.height + scale - 1) / scale).max(1),
+            })
+            .collect(),
             None => Vec::new(),
         };
 
@@ -686,6 +736,9 @@ impl Overlay {
         layer.set_exclusive_zone(-1);
         layer.set_size(self.width, self.height);
         layer.set_margin(self.y, 0, 0, self.x);
+        layer
+            .wl_surface()
+            .set_buffer_scale(self.buffer_scale.max(1));
         layer.commit();
 
         self.layer = layer;
@@ -715,7 +768,7 @@ impl Overlay {
             width: self.width,
             height: self.height,
             output,
-            scale: self.scale,
+            scale: self.buffer_scale,
         });
     }
 

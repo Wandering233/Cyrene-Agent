@@ -22,6 +22,8 @@ export interface PetOverlayControllerOptions {
   zoom: number;
   alwaysOnTop: boolean;
   showOnReady: boolean;
+  /** Integer render scale (physical pixels per logical pixel). */
+  scale?: number;
   /** Output name (e.g. HDMI-A-1) selected by Electron; empty/undefined = compositor default. */
   output?: string;
 }
@@ -47,6 +49,7 @@ const HOST_RESTART_DELAYS_MS = [500, 1500, 3000];
 export class PetOverlayController {
   readonly window: BrowserWindow;
   private readonly options: PetOverlayControllerOptions;
+  private readonly renderScale: number;
   private x: number;
   private y: number;
   private width: number;
@@ -77,6 +80,7 @@ export class PetOverlayController {
 
   constructor(options: PetOverlayControllerOptions) {
     this.options = options;
+    this.renderScale = Math.max(1, Math.round(options.scale ?? 1));
     this.width = options.width;
     this.height = options.height;
     this.x = options.x;
@@ -86,8 +90,8 @@ export class PetOverlayController {
     this.alwaysOnTop = options.alwaysOnTop;
 
     this.window = new BrowserWindow({
-      width: this.width,
-      height: this.height,
+      width: Math.round(this.width * this.renderScale),
+      height: Math.round(this.height * this.renderScale),
       show: false,
       frame: false,
       transparent: true,
@@ -179,7 +183,10 @@ export class PetOverlayController {
     if (width === this.width && height === this.height) return;
     this.width = width;
     this.height = height;
-    this.window.setSize(width, height);
+    this.window.setSize(
+      Math.round(width * this.renderScale),
+      Math.round(height * this.renderScale),
+    );
     this.latest = null;
     if (this.hostReady) {
       this.host?.sendControl({ type: "size", width, height });
@@ -256,6 +263,7 @@ export class PetOverlayController {
       height: this.height,
       x: this.x,
       y: this.y,
+      scale: this.renderScale,
       output: this.options.output,
     });
     host.sendControl({
@@ -397,8 +405,10 @@ export class PetOverlayController {
 
   private forwardPointer(event: PointerEvent): void {
     if (this.window.isDestroyed()) return;
-    const x = Math.round(event.x);
-    const y = Math.round(event.y);
+    // Host pointer coordinates are logical; the offscreen page is rendered at
+    // physical pixels so a 2x buffer stays sharp.
+    const x = Math.round(event.x * this.renderScale);
+    const y = Math.round(event.y * this.renderScale);
     switch (event.event) {
       case "enter":
         this.window.webContents.sendInputEvent({ type: "mouseEnter", x, y });

@@ -3,7 +3,7 @@
 > 基线：`e42a45b4 feat(跨平台): 增加 Linux Wayland 原生桌宠 overlay`
 > 环境：Arch Linux + Hyprland 0.57.1 + Wayland，Electron 44.7.2
 > 说明：本文是**全量任务清单与逐项核对结果**；已完成项会随实现更新。
-> 最近更新：XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发实测。
+> 最近更新：XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）。
 
 ## 状态图例
 
@@ -34,8 +34,8 @@
 | OVL-01 | ❌ | GNOME 全屏透明 `xdg_toplevel` fallback | 宿主只 bind `zwlr_layer_shell_v1`；失败直接报 `LAYER_SHELL_UNAVAILABLE` | 新建 fullscreen xdg_toplevel 后端；Mutter 实测 | P0 |
 | OVL-02 | ❌ | GNOME 全屏父 surface + 子 surface/局部 buffer | 无 `wl_subsurface`/viewporter 代码 | 4K 不全屏缓冲；只画桌宠区域 | P0 |
 | OVL-03 | ❌ | GNOME 全屏态副作用 | 无 GNOME 检测/处理 | 顶栏、概览、全屏提示、idle inhibit 验证 | P0 |
-| OVL-04 | ❌ | HiDPI buffer scale | `scale` 只记录，没有 `set_buffer_scale` | 按输出 scale 渲染物理像素；坐标换算 | P0 |
-| OVL-05 | ❌ | 分数缩放 1.25/1.5 | 坐标全按逻辑像素 | 缩放/位置/输入区域换算测试 | P0 |
+| OVL-04 | ✅ | HiDPI buffer scale | 初始化 scale、物理 buffer、`set_buffer_scale`、input region/指针换算；`CYRENE_OVERLAY_SCALE=2` 实测 800x1000 buffer 显示在 400x500 layer，角落穿透/中心点击正确 | 真实 2x 输出待 OVL-27 | P0 |
+| OVL-05 | 🟡 | 分数缩放 1.25/1.5 | 使用 `ceil(scale)` 整数超采样（1.25/1.5→2x），逻辑坐标不变 | 真实 1.25/1.5 输出实机；非整数 buffer_scale 替代方案 | P0 |
 | OVL-06 | ✅ | 按 `init.output` 选择输出 | 已实现名称匹配 + layer surface 重建；实测 `switched overlay to output HDMI-A-1` | 多屏互切归 OVL-07/27 | P0 |
 | OVL-07 | ❌ | 多屏热插拔/位置持久化 | 位置是全局 x/y，未绑定输出 | 输出移除/重连/位置恢复 | P0 |
 | OVL-08 | ❌ | 跨输出拖拽 | 拖拽只改 margin，不换输出 | 跨屏 surface 迁移/坐标重算 | P1 |

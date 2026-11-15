@@ -17,6 +17,7 @@ export interface InitMessage {
   height: number;
   x: number;
   y: number;
+  scale: number;
   output?: string;
   namespace?: string;
   layer?: "top" | "overlay";

@@ -11,6 +11,8 @@ pub enum Control {
     Init {
         #[serde(default)]
         protocol: Option<u32>,
+        #[serde(default)]
+        scale: Option<i32>,
         width: u32,
         height: u32,
         x: i32,

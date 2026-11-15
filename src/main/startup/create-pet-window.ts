@@ -103,6 +103,12 @@ export function createPetWindow(
   const outputLabel = rawDisplayLabel
     ? rawDisplayLabel.replace(/^\((.*)\)$/, "$1")
     : undefined;
+  const requestedScale = Number(process.env.CYRENE_OVERLAY_SCALE);
+  const displayScale = Number(targetDisplay.scaleFactor);
+  const overlayScale = Math.max(
+    1,
+    Math.ceil(Number.isFinite(requestedScale) && requestedScale > 0 ? requestedScale : displayScale),
+  );
 
   if (!options.forceNormal && shouldUsePetOverlay()) {
     try {
@@ -116,6 +122,7 @@ export function createPetWindow(
         alwaysOnTop: settings.petAlwaysOnTop ?? true,
         showOnReady,
         output: outputLabel,
+        scale: overlayScale,
       });
       if (overlay) {
         console.log("[Cyrene] using native Wayland pet overlay host");
