@@ -52,6 +52,7 @@ use wayland_client::{
 };
 use wayland_protocols::wp::relative_pointer::zv1::client::zwp_relative_pointer_v1::ZwpRelativePointerV1;
 
+const PROTOCOL_VERSION: u32 = 1;
 const DEFAULT_WIDTH: u32 = 400;
 const DEFAULT_HEIGHT: u32 = 500;
 const BUFFER_COUNT: usize = 3;
@@ -415,13 +416,25 @@ impl Overlay {
     fn handle_control(&mut self, control: Control) {
         match control {
             Control::Init {
+                protocol,
                 width,
                 height,
                 x,
                 y,
                 output,
-                ..
             } => {
+                if let Some(version) = protocol {
+                    if version != PROTOCOL_VERSION {
+                        self.writer.send(&HostEvent::Error {
+                            code: "PROTOCOL_MISMATCH".into(),
+                            message: format!(
+                                "host protocol {PROTOCOL_VERSION}, Electron protocol {version}"
+                            ),
+                        });
+                        self.stop();
+                        return;
+                    }
+                }
                 debug!("init {width}x{height} at ({x},{y}) output={output:?}");
                 self.x = x;
                 self.y = y;
@@ -698,6 +711,7 @@ impl Overlay {
             .as_ref()
             .and_then(|output| self.output_state.info(output).and_then(|info| info.name));
         self.writer.send(&HostEvent::Ready {
+            protocol: PROTOCOL_VERSION,
             width: self.width,
             height: self.height,
             output,

@@ -14,8 +14,8 @@ describe("pet overlay protocol", () => {
   });
 
   it("parses host events and rejects malformed lines", () => {
-    expect(parseHostEvent('{"type":"ready","width":400,"height":500,"output":null,"scale":1}'))
-      .toEqual({ type: "ready", width: 400, height: 500, output: null, scale: 1 });
+    expect(parseHostEvent('{"type":"ready","protocol":1,"width":400,"height":500,"output":null,"scale":1}'))
+      .toEqual({ type: "ready", protocol: 1, width: 400, height: 500, output: null, scale: 1 });
     expect(parseHostEvent("")).toBeNull();
     expect(parseHostEvent("not json")).toBeNull();
     expect(parseHostEvent('{"type":42}')).toBeNull();

@@ -3,8 +3,10 @@ import path from "node:path";
 import { IPC } from "../../shared/ipc-channels";
 import { PetOverlayHostClient } from "./host-client";
 import {
+  PROTOCOL_VERSION,
   frameStride,
   pointerButtonName,
+  type ControlMessage,
   type DragEvent,
   type HostEvent,
   type PointerEvent,
@@ -30,6 +32,9 @@ interface LatestFrame {
   height: number;
 }
 
+const MAX_HOST_RESTARTS = 3;
+const HOST_RESTART_DELAYS_MS = [500, 1500, 3000];
+
 /**
  * Linux/Wayland pet backend.
  *
@@ -41,7 +46,6 @@ interface LatestFrame {
  */
 export class PetOverlayController {
   readonly window: BrowserWindow;
-  private readonly host: PetOverlayHostClient;
   private readonly options: PetOverlayControllerOptions;
   private x: number;
   private y: number;
@@ -50,7 +54,13 @@ export class PetOverlayController {
   private zoom: number;
   private visible: boolean;
   private alwaysOnTop: boolean;
+  private host: PetOverlayHostClient | null = null;
   private hostReady = false;
+  private hostGeneration = 0;
+  private restartAttempts = 0;
+  private restartScheduled = false;
+  private restartTimer: NodeJS.Timeout | null = null;
+  private stableTimer: NodeJS.Timeout | null = null;
   private failed = false;
   private disposed = false;
   private latest: LatestFrame | null = null;
@@ -96,12 +106,6 @@ export class PetOverlayController {
       console.log("[PetOverlayRenderer]", message);
     });
 
-    this.host = new PetOverlayHostClient(options.binaryPath, {
-      onEvent: (event) => this.handleHostEvent(event),
-      onFailure: (error) => this.fail(error),
-      onLog: (message) => console.log("[PetOverlayHost]", message),
-    });
-
     this.window.on("closed", () => this.dispose());
     this.window.webContents.on("render-process-gone", (_event, details) => {
       this.fail(new Error(`pet overlay renderer gone: ${details.reason}`));
@@ -135,7 +139,7 @@ export class PetOverlayController {
     if (!this.window.isDestroyed()) {
       this.window.webContents.send(IPC.PET_VISIBILITY_CHANGED, true);
     }
-    if (this.hostReady) this.host.sendControl({ type: "show" });
+    if (this.hostReady) this.host?.sendControl({ type: "show" });
   }
 
   hide(): void {
@@ -144,14 +148,14 @@ export class PetOverlayController {
     if (!this.window.isDestroyed()) {
       this.window.webContents.send(IPC.PET_VISIBILITY_CHANGED, false);
     }
-    if (this.hostReady) this.host.sendControl({ type: "hide" });
+    if (this.hostReady) this.host?.sendControl({ type: "hide" });
   }
 
   moveTo(x: number, y: number): void {
     if (this.failed || this.disposed) return;
     this.x = Math.round(x);
     this.y = Math.round(y);
-    if (this.hostReady) this.host.sendControl({ type: "move", x: this.x, y: this.y });
+    if (this.hostReady) this.host?.sendControl({ type: "move", x: this.x, y: this.y });
     this.emitMoved();
   }
 
@@ -171,7 +175,7 @@ export class PetOverlayController {
     this.window.setSize(width, height);
     this.latest = null;
     if (this.hostReady) {
-      this.host.sendControl({ type: "size", width, height });
+      this.host?.sendControl({ type: "size", width, height });
     }
     if (!this.window.isDestroyed()) {
       this.window.webContents.send(IPC.PET_ZOOM, zoom);
@@ -181,13 +185,13 @@ export class PetOverlayController {
   setAlwaysOnTop(alwaysOnTop: boolean): void {
     this.alwaysOnTop = alwaysOnTop;
     if (this.hostReady) {
-      this.host.sendControl({ type: "layer", layer: alwaysOnTop ? "overlay" : "top" });
+      this.host?.sendControl({ type: "layer", layer: alwaysOnTop ? "overlay" : "top" });
     }
   }
 
   setInteractive(interactive: boolean): void {
     if (!this.hostReady) return;
-    this.host.sendControl({ type: "interactive", interactive });
+    this.host?.sendControl({ type: "interactive", interactive });
   }
 
   async capturePage(): Promise<NativeImage> {
@@ -203,34 +207,115 @@ export class PetOverlayController {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.host.stop();
+    this.clearRestartTimers();
+    this.host?.stop();
+    this.host = null;
+    this.hostReady = false;
   }
 
   private async startHost(): Promise<void> {
+    if (this.failed || this.disposed) return;
+    this.restartScheduled = false;
+    const generation = ++this.hostGeneration;
+    const host = new PetOverlayHostClient(this.options.binaryPath, {
+      onEvent: (event) => {
+        if (generation === this.hostGeneration) this.handleHostEvent(event);
+      },
+      onFailure: (error) => {
+        if (generation === this.hostGeneration) this.handleHostFailure(error);
+      },
+      onLog: (message) => console.log("[PetOverlayHost]", message),
+    });
+    this.host = host;
+
     try {
-      await this.host.start();
+      await host.start();
     } catch (error) {
-      this.fail(error instanceof Error ? error : new Error(String(error)));
+      if (this.host !== host || this.disposed) return;
+      this.handleHostFailure(error instanceof Error ? error : new Error(String(error)));
       return;
     }
-    if (this.disposed) return;
+
+    if (this.disposed || this.failed || this.host !== host) {
+      host.stop();
+      return;
+    }
+
     this.hostReady = true;
-    this.host.sendControl({
+    host.sendControl({
       type: "init",
+      protocol: PROTOCOL_VERSION,
       width: this.width,
       height: this.height,
       x: this.x,
       y: this.y,
       output: this.options.output,
     });
-    this.host.sendControl({
+    host.sendControl({
       type: "layer",
       layer: this.alwaysOnTop ? "overlay" : "top",
     });
-    if (this.visible) this.host.sendControl({ type: "show" });
-    else this.host.sendControl({ type: "hide" });
+    host.sendControl({ type: this.visible ? "show" : "hide" });
     this.flushLatestFrame();
     this.emitReady();
+    this.scheduleStableReset(generation);
+  }
+
+  private scheduleStableReset(generation: number): void {
+    if (this.stableTimer) clearTimeout(this.stableTimer);
+    this.stableTimer = setTimeout(() => {
+      this.stableTimer = null;
+      if (generation === this.hostGeneration && this.hostReady) {
+        this.restartAttempts = 0;
+      }
+    }, 10_000);
+    this.stableTimer.unref?.();
+  }
+
+  private handleHostFailure(error: Error): void {
+    if (this.failed || this.disposed || this.restartScheduled) return;
+    this.hostReady = false;
+    const host = this.host;
+    this.host = null;
+    host?.stop();
+
+    if (this.isUnrecoverable(error) || this.restartAttempts >= MAX_HOST_RESTARTS) {
+      this.fail(error);
+      return;
+    }
+
+    this.restartScheduled = true;
+    const delay = HOST_RESTART_DELAYS_MS[
+      Math.min(this.restartAttempts, HOST_RESTART_DELAYS_MS.length - 1)
+    ];
+    this.restartAttempts += 1;
+    console.warn(
+      `[PetOverlay] host failed (attempt ${this.restartAttempts}/${MAX_HOST_RESTARTS}); retrying in ${delay}ms:`,
+      error,
+    );
+    this.restartTimer = setTimeout(() => {
+      this.restartTimer = null;
+      this.restartScheduled = false;
+      void this.startHost();
+    }, delay);
+    this.restartTimer.unref?.();
+  }
+
+  private isUnrecoverable(error: Error): boolean {
+    return error.message.includes("LAYER_SHELL_UNAVAILABLE")
+      || error.message.includes("PROTOCOL_MISMATCH");
+  }
+
+  private clearRestartTimers(): void {
+    if (this.restartTimer) {
+      clearTimeout(this.restartTimer);
+      this.restartTimer = null;
+    }
+    if (this.stableTimer) {
+      clearTimeout(this.stableTimer);
+      this.stableTimer = null;
+    }
+    this.restartScheduled = false;
   }
 
   private handlePaint(image: NativeImage): void {
@@ -248,8 +333,9 @@ export class PetOverlayController {
 
   private flushLatestFrame(): void {
     const frame = this.latest;
-    if (!frame || !this.hostReady) return;
-    const sent = this.host.sendFrame(
+    const host = this.host;
+    if (!frame || !host || !this.hostReady) return;
+    const sent = host.sendFrame(
       this.frameSeq++,
       frame.bitmap,
       frame.width,
@@ -272,6 +358,12 @@ export class PetOverlayController {
   private handleHostEvent(event: HostEvent): void {
     switch (event.type) {
       case "ready":
+        if (event.protocol !== PROTOCOL_VERSION) {
+          this.fail(new Error(
+            `PROTOCOL_MISMATCH: host ${event.protocol}, Electron ${PROTOCOL_VERSION}`,
+          ));
+          return;
+        }
         this.hostReady = true;
         this.flushLatestFrame();
         this.emitReady();
@@ -291,7 +383,7 @@ export class PetOverlayController {
         console.log("[PetOverlayHost]", event.message);
         break;
       case "error":
-        this.fail(new Error(`${event.code}: ${event.message}`));
+        this.handleHostFailure(new Error(`${event.code}: ${event.message}`));
         break;
     }
   }
@@ -324,8 +416,8 @@ export class PetOverlayController {
         break;
       }
       case "axis":
-        // The pet page currently has no wheel interaction; ignore until the
-        // host forwards precise scroll deltas.
+        // Scroll forwarding is a separate follow-up; the pet page has no
+        // wheel interaction yet.
         break;
     }
   }
@@ -348,7 +440,10 @@ export class PetOverlayController {
     if (this.failed || this.disposed) return;
     this.failed = true;
     console.error("[PetOverlay] failed:", error);
-    this.host.stop();
+    this.clearRestartTimers();
+    this.host?.stop();
+    this.host = null;
+    this.hostReady = false;
     if (!this.window.isDestroyed()) {
       this.window.emit("pet-overlay-failed", error);
     }

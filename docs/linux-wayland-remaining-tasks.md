@@ -3,7 +3,7 @@
 > 基线：`e42a45b4 feat(跨平台): 增加 Linux Wayland 原生桌宠 overlay`
 > 环境：Arch Linux + Hyprland 0.57.1 + Wayland，Electron 44.7.2
 > 说明：本文是**全量任务清单与逐项核对结果**；已完成项会随实现更新。
-> 最近更新：XDG autostart / `--autostart` 静默启动（打包实机验证）；overlay 按 `init.output` 选择输出（单屏验证）。
+> 最近更新：XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验。
 
 ## 状态图例
 
@@ -41,8 +41,8 @@
 | OVL-08 | ❌ | 跨输出拖拽 | 拖拽只改 margin，不换输出 | 跨屏 surface 迁移/坐标重算 | P1 |
 | OVL-09 | 🟡 | `petAlwaysOnTop=false` 语义 | 已能切 `TOP`/`OVERLAY`，但关闭仍是 `TOP` | 普通层级模式或明确文档化限制 | P1 |
 | OVL-10 | 🟡 | 全屏/锁屏/通知 z-order | 只验证普通窗口 | 全屏游戏、锁屏、通知中心、面板遮挡 | P1 |
-| OVL-11 | ❌ | 宿主崩溃自动重启/watchdog | 失败只回退普通窗口 | 带退避的重启；重启后恢复位置/缩放 | P1 |
-| OVL-12 | ❌ | 协议版本握手/能力协商 | 无版本字段 | 不兼容时明确报错，不静默 | P1 |
+| OVL-11 | ✅ | 宿主崩溃自动重启/watchdog | 3 次退避重启（500/1500/3000ms）；实测 kill -9 后新宿主启动、layer/位置恢复；不可恢复错误直接回退 | 长时间 watchdog 仍可加强 | P1 |
+| OVL-12 | 🟡 | 协议版本握手/能力协商 | init/ready 带 `protocol:1`；宿主不匹配发 `PROTOCOL_MISMATCH` 并退出 | 端到端不匹配实测 | P1 |
 | OVL-13 | 🟡 | socket/多实例/stale 清理 | 已 `chmod 0600`、按 PID 命名、退出删除 | 并发启动、残留 socket、异常退出测试 | P1 |
 | OVL-14 | ❌ | shared texture/DMA-BUF 零拷贝 | 当前 CPU bitmap + socket 拷贝 | 评估 `offscreen.useSharedTexture`，降 CPU/延迟 | P2 |
 | OVL-15 | ❌ | 4K/120Hz/大尺寸性能 | 只测 400×500 约 59fps | 4K/600×750/120Hz 基准与优化 | P1 |

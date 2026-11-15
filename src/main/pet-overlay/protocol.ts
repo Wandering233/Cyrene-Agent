@@ -8,8 +8,11 @@
  * Wayland's `WL_SHM_FORMAT_ARGB8888` expects on little-endian machines).
  */
 
+export const PROTOCOL_VERSION = 1;
+
 export interface InitMessage {
   type: "init";
+  protocol: number;
   width: number;
   height: number;
   x: number;
@@ -73,6 +76,7 @@ export interface FrameHeader {
 
 export interface ReadyEvent {
   type: "ready";
+  protocol: number;
   width: number;
   height: number;
   output: string | null;

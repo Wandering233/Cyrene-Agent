@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Control {
     Init {
+        #[serde(default)]
+        protocol: Option<u32>,
         width: u32,
         height: u32,
         x: i32,
@@ -58,6 +60,7 @@ impl FrameHeader {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum HostEvent {
     Ready {
+        protocol: u32,
         width: u32,
         height: u32,
         output: Option<String>,
