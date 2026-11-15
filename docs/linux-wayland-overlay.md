@@ -66,8 +66,9 @@ BrowserWindow，不会让桌宠完全消失。GNOME/Mutter 不实现 layer-shell
 
 ## 已知限制
 
-- 需要 `zwlr_layer_shell_v1`；GNOME/Mutter 不支持，当前会回退普通窗口。
-  GNOME 的全屏透明 fallback 尚未实现；因此 GNOME 下仍没有逐像素穿透。
+- 需要 `zwlr_layer_shell_v1`；GNOME/Mutter 不支持 layer-shell 时，自动使用
+  `cyrene-overlay-fullscreen`（xdg_toplevel 全屏 + 输入区域），因此 GNOME 也有
+  逐像素穿透/定位能力，但会进入全屏态（顶栏/概览副作用待验证）。
 - HiDPI 目前按逻辑尺寸渲染，由合成器放大；后续可用 `wl_surface.set_buffer_scale`
   或按输出 scale 渲染。
 - 多显示器暂未按 `init.output` 选择输出，使用合成器默认输出。

@@ -31,9 +31,9 @@
 
 | ID | 状态 | 任务 | 核对证据/现状 | 剩余工作与验收 | 优先级 |
 |---|---|---|---|---|---|
-| OVL-01 | ❌ | GNOME 全屏透明 `xdg_toplevel` fallback | 宿主只 bind `zwlr_layer_shell_v1`；失败直接报 `LAYER_SHELL_UNAVAILABLE` | 新建 fullscreen xdg_toplevel 后端；Mutter 实测 | P0 |
-| OVL-02 | ❌ | GNOME 全屏父 surface + 子 surface/局部 buffer | 无 `wl_subsurface`/viewporter 代码 | 4K 不全屏缓冲；只画桌宠区域 | P0 |
-| OVL-03 | ❌ | GNOME 全屏态副作用 | 无 GNOME 检测/处理 | 顶栏、概览、全屏提示、idle inhibit 验证 | P0 |
+| OVL-01 | 🟡 | GNOME 全屏透明 `xdg_toplevel` fallback | 新增 `cyrene-overlay-fullscreen`：xdg_toplevel 全屏 + 透明全屏 buffer；Hyprland 强制 fullscreen 实测 client fullscreen=2、2238x1492、宠物在 900,400 | GNOME/Mutter 实机；多屏坐标 | P0 |
+| OVL-02 | 🟡 | GNOME 全屏父 surface + 子 surface/局部 buffer | 当前使用全屏 ARGB buffer（透明底 + 宠物区域拷贝/damage），未用 subsurface | 4K 带宽优化；subsurface/局部 buffer | P0 |
+| OVL-03 | ❌ | GNOME 全屏态副作用 | 未处理 | 顶栏、概览、全屏提示、idle inhibit 验证 | P0 |
 | OVL-04 | ✅ | HiDPI buffer scale | 真实 HEADLESS output scale=2 实机：layer 400x500、buffer 800x1000；强制 2x 穿透/点击也验证 | 已验收 | P0 |
 | OVL-05 | 🟡 | 分数缩放 1.25/1.5 | 使用 `ceil(scale)` 整数超采样（1.25/1.5→2x），逻辑坐标不变 | 真实 1.25/1.5 输出实机；非整数 buffer_scale 替代方案 | P0 |
 | OVL-06 | ✅ | 按 `init.output` 选择输出 | 实机在 HEADLESS-1/2（x=2238, scale=2）创建 layer，位于 [2500,100]；输出名匹配/重建有效 | 多屏互切归 OVL-07/27 | P0 |

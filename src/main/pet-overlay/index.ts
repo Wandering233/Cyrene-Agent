@@ -6,15 +6,30 @@ import { registerPetOverlay } from "./registry";
 
 export { getPetOverlay } from "./registry";
 
-export function resolveOverlayHostBinary(): string | null {
+export type OverlayBackend = "layer" | "fullscreen";
+
+export function resolveOverlayBackend(): OverlayBackend {
+  const explicit = process.env.CYRENE_OVERLAY_BACKEND?.trim().toLowerCase();
+  if (explicit === "fullscreen" || explicit === "layer") return explicit;
+  const desktop = (process.env.XDG_CURRENT_DESKTOP ?? "").toLowerCase();
+  if (desktop.includes("gnome")) return "fullscreen";
+  return "layer";
+}
+
+function backendBinaryName(backend: OverlayBackend): string {
+  return backend === "fullscreen" ? "cyrene-overlay-fullscreen" : "cyrene-overlay-host";
+}
+
+export function resolveOverlayHostBinary(backend: OverlayBackend = resolveOverlayBackend()): string | null {
   const override = process.env.CYRENE_OVERLAY_HOST_BIN;
   if (override) return existsSync(override) ? override : null;
 
+  const name = backendBinaryName(backend);
   const candidates = app.isPackaged
-    ? [path.join(process.resourcesPath, "bin", "cyrene-overlay-host")]
+    ? [path.join(process.resourcesPath, "bin", name)]
     : [
-        path.join(app.getAppPath(), "native", "cyrene-overlay-host", "target", "release", "cyrene-overlay-host"),
-        path.join(app.getAppPath(), "native", "cyrene-overlay-host", "target", "debug", "cyrene-overlay-host"),
+        path.join(app.getAppPath(), "native", "cyrene-overlay-host", "target", "release", name),
+        path.join(app.getAppPath(), "native", "cyrene-overlay-host", "target", "debug", name),
       ];
   return candidates.find((candidate) => existsSync(candidate)) ?? null;
 }
@@ -24,24 +39,24 @@ export function shouldUsePetOverlay(): boolean {
   const mode = process.env.CYRENE_PET_OVERLAY;
   if (mode === "0") return false;
   if (!process.env.WAYLAND_DISPLAY && process.env.XDG_SESSION_TYPE !== "wayland") return false;
-  // Mutter does not implement wlr-layer-shell. Explicitly enabling the overlay
-  // is still allowed for development, but the automatic path avoids spawning a
-  // host that can only fail and fall back.
-  if (mode !== "1" && (process.env.XDG_CURRENT_DESKTOP ?? "").toLowerCase().includes("gnome")) {
-    return false;
-  }
   return resolveOverlayHostBinary() !== null;
 }
 
 export interface CreatePetOverlayOptions
-  extends Omit<PetOverlayControllerOptions, "isDev" | "binaryPath"> {
+  extends Omit<PetOverlayControllerOptions, "isDev" | "binaryPath" | "scale"> {
   isDev: boolean;
+  backend?: OverlayBackend;
+  scale?: number;
 }
 
 export function createPetOverlayWindow(options: CreatePetOverlayOptions): PetOverlayController | null {
-  const binaryPath = resolveOverlayHostBinary();
+  const backend = options.backend ?? resolveOverlayBackend();
+  const binaryPath = resolveOverlayHostBinary(backend);
   if (!binaryPath) return null;
-  const controller = new PetOverlayController({ ...options, binaryPath });
+  // The fullscreen fallback currently renders at 1x buffer scale; keep the
+  // frame/coordinate contract simple until per-output buffer scale is added.
+  const scale = backend === "fullscreen" ? 1 : (options.scale ?? 1);
+  const controller = new PetOverlayController({ ...options, binaryPath, scale });
   registerPetOverlay(controller.window, controller);
   return controller;
 }

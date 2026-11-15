@@ -11,15 +11,7 @@ if (process.platform !== "linux") {
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDirectory, "..", "..");
 const manifestPath = path.join(repoRoot, "native", "cyrene-overlay-host", "Cargo.toml");
-const builtPath = path.join(
-  repoRoot,
-  "native",
-  "cyrene-overlay-host",
-  "target",
-  "release",
-  "cyrene-overlay-host",
-);
-const stagedPath = path.join(repoRoot, "resources", "bin", "linux", "cyrene-overlay-host");
+const binaries = ["cyrene-overlay-host", "cyrene-overlay-fullscreen"];
 
 const result = spawnSync(
   "cargo",
@@ -35,7 +27,18 @@ if (result.status !== 0) {
   process.exit(result.status ?? 1);
 }
 
-await mkdir(path.dirname(stagedPath), { recursive: true });
-await copyFile(builtPath, stagedPath);
-await chmod(stagedPath, 0o755);
-console.log(`[overlay-host] staged ${stagedPath}`);
+for (const binary of binaries) {
+  const builtPath = path.join(
+    repoRoot,
+    "native",
+    "cyrene-overlay-host",
+    "target",
+    "release",
+    binary,
+  );
+  const stagedPath = path.join(repoRoot, "resources", "bin", "linux", binary);
+  await mkdir(path.dirname(stagedPath), { recursive: true });
+  await copyFile(builtPath, stagedPath);
+  await chmod(stagedPath, 0o755);
+  console.log(`[overlay-host] staged ${stagedPath}`);
+}
