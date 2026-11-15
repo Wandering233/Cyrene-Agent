@@ -7,7 +7,7 @@ import { IPC } from "../../shared/ipc-channels";
 import { createIpcScope, type IpcScope } from "../application/ipc-scope";
 import { ElectronScreenshotHelperClient } from "./helper-client";
 import { resolveScreenshotHelperPath } from "./helper-path";
-import { captureLinuxScreenshot } from "./linux-screenshot";
+import { captureLinuxScreenshot, pruneScreenshotDirectory } from "./linux-screenshot";
 import {
   createScreenshotService,
   validateScreenshotInsert,
@@ -133,6 +133,9 @@ export function initializeScreenshotService(
   });
   // 启动即建目录 + 记录实际输出目录（排查 0x80070003 类路径问题）。
   void ensureScreenshotDirectory(screenshotDirectory);
+  if (process.platform === "linux") {
+    void pruneScreenshotDirectory(screenshotDirectory);
+  }
   console.log("[Screenshot] helper output-dir =", screenshotDirectory);
 
   const service = createScreenshotService({

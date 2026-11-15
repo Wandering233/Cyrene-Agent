@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { copyFile, mkdir } from "node:fs/promises";
+import { chmod, copyFile, mkdir, readdir, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { randomUUID } from "node:crypto";
@@ -82,6 +82,7 @@ export async function captureLinuxScreenshot(
         );
       }
     }
+    await chmod(filePath, 0o600);
     return filePath;
   }
 
@@ -90,6 +91,10 @@ export async function captureLinuxScreenshot(
   try {
     const result = await captureScreenshotViaPortal({ interactive: options.interactive });
     await copyFile(result.filePath, filePath);
+    // The portal may have written its own file (often in ~/Pictures). We own
+    // only the copy in app storage; remove the intermediate file.
+    await rm(result.filePath, { force: true }).catch(() => {});
+    await chmod(filePath, 0o600);
     return filePath;
   } catch (error) {
     throw new LinuxScreenshotError(
@@ -126,4 +131,41 @@ async function defaultRun(
     windowsHide: true,
   });
   return { stdout: result.stdout, stderr: result.stderr };
+}
+
+
+/**
+ * Keep app-owned screenshots bounded and private.
+ *
+ * Called at startup; failures are ignored so a stale directory can never
+ * prevent the app from starting.
+ */
+export async function pruneScreenshotDirectory(
+  outputDirectory: string,
+  options: { maxAgeMs?: number; maxFiles?: number; now?: number } = {},
+): Promise<void> {
+  const maxAgeMs = options.maxAgeMs ?? 7 * 24 * 60 * 60 * 1000;
+  const maxFiles = options.maxFiles ?? 100;
+  const now = options.now ?? Date.now();
+  try {
+    const names = (await readdir(outputDirectory)).filter((name) => name.endsWith(".png"));
+    const entries = await Promise.all(names.map(async (name) => {
+      const filePath = path.join(outputDirectory, name);
+      try {
+        const info = await stat(filePath);
+        return { filePath, mtimeMs: info.mtimeMs };
+      } catch {
+        return null;
+      }
+    }));
+    const live = entries.filter((entry): entry is { filePath: string; mtimeMs: number } => entry !== null)
+      .sort((a, b) => b.mtimeMs - a.mtimeMs);
+    for (const [index, entry] of live.entries()) {
+      if (index >= maxFiles || now - entry.mtimeMs > maxAgeMs) {
+        await rm(entry.filePath, { force: true }).catch(() => {});
+      }
+    }
+  } catch {
+    // Missing directory or permission issue: nothing to prune.
+  }
 }
