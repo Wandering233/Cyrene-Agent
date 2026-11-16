@@ -3,7 +3,7 @@
 > 基线：`e42a45b4 feat(跨平台): 增加 Linux Wayland 原生桌宠 overlay`
 > 环境：Arch Linux + Hyprland 0.57.1 + Wayland，Electron 44.7.2
 > 说明：本文是**全量任务清单与逐项核对结果**；已完成项会随实现更新。
-> 最近更新：跨 DE/X11 项标记不适用；截图快捷键设置 UI；桌宠右键菜单；宿主版本绑定；fullscreen fallback 验收；input region 自适应/基准；AppImage 产物验收；Doctor AppArmor 检测；截图隐私/清理验收；更新校验和验收；Linux release 工作流；1.25 分数缩放验收；CI/校验和验收；标注取消清理；GS-03 按键触发验收；4K120/600x750 验收；Toast 高对比度；QA-03 60s 验收；soak CPU/fd 采样；Wayland touch 转发；4K 输出性能采样；60s soak/隐藏渲染验收；Toast 键盘可达性；OVL-16 延迟指标；QA-01 宿主集成测试验收；协议校验脚本；UPD-01 本地 feed 验收；OVL-12 协议不匹配 e2e；SHOT-02 窗口截图验收；窗口截图目标；GS-01/GS-04 验收；SHOT-05 多屏截图验收；slurp 选区修复；打包校验和校验；DE 矩阵文档验收；协议 fuzz/reduced motion；宿主校验和；WIN-03 Hyprland 光标回退验收；主题指针；clickCount 单测；QA-04 失败路径；仅 Hyprland 范围；OVL-09 bottom layer；OVL-13；验收状态汇总；overlay soak；overlay 帧统计；Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
+> 最近更新：Hyprland 截图兜底验收；Hyprland 截图兜底验收；跨 DE/X11 项标记不适用；截图快捷键设置 UI；桌宠右键菜单；宿主版本绑定；fullscreen fallback 验收；input region 自适应/基准；AppImage 产物验收；Doctor AppArmor 检测；截图隐私/清理验收；更新校验和验收；Linux release 工作流；1.25 分数缩放验收；CI/校验和验收；标注取消清理；GS-03 按键触发验收；4K120/600x750 验收；Toast 高对比度；QA-03 60s 验收；soak CPU/fd 采样；Wayland touch 转发；4K 输出性能采样；60s soak/隐藏渲染验收；Toast 键盘可达性；OVL-16 延迟指标；QA-01 宿主集成测试验收；协议校验脚本；UPD-01 本地 feed 验收；OVL-12 协议不匹配 e2e；SHOT-02 窗口截图验收；窗口截图目标；GS-01/GS-04 验收；SHOT-05 多屏截图验收；slurp 选区修复；打包校验和校验；DE 矩阵文档验收；协议 fuzz/reduced motion；宿主校验和；WIN-03 Hyprland 光标回退验收；主题指针；clickCount 单测；QA-04 失败路径；仅 Hyprland 范围；OVL-09 bottom layer；OVL-13；验收状态汇总；overlay soak；overlay 帧统计；Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
 
 
 ## 验证范围（按用户指定）
@@ -78,7 +78,7 @@
 | SHOT-03 | ✅ | 标注 overlay | 新增 Electron 标注窗口（画笔/矩形/箭头/撤销/清空/保存/取消）；自动化保存实测生成同尺寸 annotated PNG | 文字/马赛克可后续 | P0 |
 | SHOT-04 | ✅ | 剪贴板/文件保存 | 截图/标注写入 userData/screenshots；热键 ClipboardItem 写剪贴板（Electron 实测读回 image/png）；标注保存实测 | 已验收 | P0 |
 | SHOT-05 | ✅ | 多屏/HiDPI 截图 | 多输出 grim 全屏 6396×2984；HEADLESS 2x 输出截图正常；区域选择修复后真实产出 PNG | 已验收（未暴露单输出选择） | P0 |
-| SHOT-06 | 🟡 | DE 兜底 | 仅 Hyprland grim/slurp；其他 DE 未跨 DE 验证 | 仅 Hyprland；其他 DE 未验 | P1 |
+| SHOT-06 | ✅ | DE 兜底 | Hyprland grim/slurp 已实现并实测；portal 回退代码存在；其他 DE 按范围不验 | 已验收（Hyprland） | P1 |
 | SHOT-07 | ✅ | 全局截图热键 | Hyprland 自动 `hl.bind("ALT+SHIFT+S")` → control socket → grim；实机按键生成 949KB PNG；Electron globalShortcut 在 Wayland 不可靠时由桌面 bind 兜底 | KDE/GNOME portal 仍待适配 | P0 |
 | SHOT-08 | ✅ | 权限/隐私/临时文件 | 0600；portal 原文件删除；启动清理 7 天/100 个；标注取消清理原图；无独立权限弹窗 | 已验收（无权限弹窗） | P1 |
 | TOAST-01 | ✅ | Toast 使用原生 overlay host | 真实主应用 `control toast-test` 触发：offscreen toast 页 → layer host，内容截图有 1229 色；普通 BrowserWindow 仍为 fallback | 已验收 | P0 |
