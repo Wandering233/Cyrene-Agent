@@ -151,3 +151,25 @@ mod tests {
         assert_eq!(bad.byte_len(), None);
     }
 }
+
+#[cfg(test)]
+mod boundary_tests {
+    use super::*;
+
+    #[test]
+    fn rejects_frame_headers_with_overflowing_stride() {
+        let header = FrameHeader {
+            width: u32::MAX,
+            height: u32::MAX,
+            stride: u32::MAX,
+        };
+        assert!(header.byte_len().is_none());
+    }
+
+    #[test]
+    fn rejects_zero_or_short_headers() {
+        let header = FrameHeader { width: 4, height: 2, stride: 0 };
+        assert!(header.byte_len().is_none());
+        assert!(serde_json::from_str::<Control>(r#"{"type":"size","width":0,"height":4}"#).is_ok());
+    }
+}

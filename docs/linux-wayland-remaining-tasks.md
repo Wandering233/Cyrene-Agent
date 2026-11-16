@@ -3,7 +3,7 @@
 > 基线：`e42a45b4 feat(跨平台): 增加 Linux Wayland 原生桌宠 overlay`
 > 环境：Arch Linux + Hyprland 0.57.1 + Wayland，Electron 44.7.2
 > 说明：本文是**全量任务清单与逐项核对结果**；已完成项会随实现更新。
-> 最近更新：doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
+> 最近更新：Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
 
 ## 状态图例
 
@@ -134,9 +134,9 @@
 | QA-02 | ❌ | 合成器 E2E 矩阵 | 只测 Hyprland | KDE/Sway/GNOME/多屏/4K | P0 |
 | QA-03 | ❌ | 性能/内存/句柄泄漏 | 只测 59fps | 长跑、CPU、RSS、fd、延迟 | P1 |
 | QA-04 | ❌ | 失败路径 | 手工测 `/bin/false` | 超时/崩溃/协议错/socket 拒绝 | P1 |
-| QA-05 | ❌ | 协议 fuzz/边界 | 基本尺寸校验 | 畸形帧/超大尺寸/半包/乱序 | P2 |
+| QA-05 | 🟡 | 协议 fuzz/边界 | Rust 边界测试覆盖 stride 溢出/零 stride；Jet 边界畸形帧仍待补 | 畸形帧/半包/乱序 fuzz | P2 |
 | QA-06 | 🟡 | 打包产物测试 | AppImage 实机 + autostart 验证；`verify:linux-artifacts` 检查 AppImage/latest-linux.yml/两个宿主 | 多架构、真实升级 | P1 |
-| QA-07 | ❌ | Linux CI | 无 Rust/Linux E2E job | GitHub Actions 矩阵 | P0 |
+| QA-07 | 🟡 | Linux CI | 新增 `.github/workflows/linux.yml`：Node checks/test + Rust test/build 两 job；尚未实际跑 CI | 远程 CI 首跑、E2E 矩阵 | P0 |
 | QA-08 | ❌ | 无障碍/减少动画 | 无 | 键盘操作、对比度、reduced motion | P2 |
 
 ---
