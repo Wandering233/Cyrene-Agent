@@ -62,7 +62,8 @@
     "release:dry": "commit-and-tag-version --dry-run",
     "build:overlay-host": "node scripts/build/overlay-host.mjs",
     "verify:linux-artifacts": "node scripts/verify/linux-artifacts.mjs",
-    "verify:linux-overlay-soak": "node scripts/verify/linux-overlay-soak.mjs"
+    "verify:linux-overlay-soak": "node scripts/verify/linux-overlay-soak.mjs",
+    "verify:overlay-protocol": "node scripts/verify/overlay-protocol-mismatch.mjs"
   },
   "engines": {
     "node": ">=24 <25",
