@@ -3,7 +3,7 @@
 > 基线：`e42a45b4 feat(跨平台): 增加 Linux Wayland 原生桌宠 overlay`
 > 环境：Arch Linux + Hyprland 0.57.1 + Wayland，Electron 44.7.2
 > 说明：本文是**全量任务清单与逐项核对结果**；已完成项会随实现更新。
-> 最近更新：4K 输出性能采样；60s soak/隐藏渲染验收；Toast 键盘可达性；OVL-16 延迟指标；QA-01 宿主集成测试验收；协议校验脚本；UPD-01 本地 feed 验收；OVL-12 协议不匹配 e2e；SHOT-02 窗口截图验收；窗口截图目标；GS-01/GS-04 验收；SHOT-05 多屏截图验收；slurp 选区修复；打包校验和校验；DE 矩阵文档验收；协议 fuzz/reduced motion；宿主校验和；WIN-03 Hyprland 光标回退验收；主题指针；clickCount 单测；QA-04 失败路径；仅 Hyprland 范围；OVL-09 bottom layer；OVL-13；验收状态汇总；overlay soak；overlay 帧统计；Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
+> 最近更新：Wayland touch 转发；4K 输出性能采样；60s soak/隐藏渲染验收；Toast 键盘可达性；OVL-16 延迟指标；QA-01 宿主集成测试验收；协议校验脚本；UPD-01 本地 feed 验收；OVL-12 协议不匹配 e2e；SHOT-02 窗口截图验收；窗口截图目标；GS-01/GS-04 验收；SHOT-05 多屏截图验收；slurp 选区修复；打包校验和校验；DE 矩阵文档验收；协议 fuzz/reduced motion；宿主校验和；WIN-03 Hyprland 光标回退验收；主题指针；clickCount 单测；QA-04 失败路径；仅 Hyprland 范围；OVL-09 bottom layer；OVL-13；验收状态汇总；overlay soak；overlay 帧统计；Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
 
 
 ## 验证范围（按用户指定）
@@ -57,7 +57,7 @@
 | OVL-17 | ✅ | 滚轮/axis 输入 | 宿主转发 axis 增量；实测 uinput wheel → `mouseWheel` → 渲染页 `wheel`（±15） | 已验收 | P1 |
 | OVL-18 | 🟡 | 双击/右键/上下文菜单 | clickCount 抽成纯函数，单测覆盖双击/三击/按键/距离/超时复位；右键转发保留 | 真实右键菜单/长按实机 | P1 |
 | OVL-19 | 🟡 | 鼠标指针形状 | 宿主改用 `ThemedPointer`，enter 设 Pointer、leave 设 Default；`grim -c` 截图仍显示箭头，可能被合成器覆盖 | 真实指针形状验证 | P2 |
-| OVL-20 | ❌ | 触摸/触控笔 | 只处理 pointer | touch/stylus 适配 | P2 |
+| OVL-20 | 🟡 | 触摸/触控笔 | 宿主接入 wl_touch，down/motion/up 映射为鼠标事件；无真实触控屏验证 | 真实触摸/触控笔、fullscreen host | P2 |
 | OVL-21 | ❌ | 键盘/IME（桌宠菜单） | `keyboard_interactivity=None`，无键盘转发 | 需要键盘时的独立模式或普通窗口 | P2 |
 | OVL-22 | ❌ | input region 精度/CPU | 4px 网格、每帧扫描 | 轮廓简化/增量更新/基准 | P2 |
 | OVL-23 | ✅ | 不可见时停止渲染 | 隐藏时帧流停止、offscreen 60→2fps；show 恢复 60 并补发最新帧；无锁屏/遮挡通知 | 已验收（帧流停止） | P2 |

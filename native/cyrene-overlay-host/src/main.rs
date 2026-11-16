@@ -22,7 +22,7 @@ use serde_json::Value;
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState},
     delegate_compositor, delegate_layer, delegate_output, delegate_pointer, delegate_registry,
-    delegate_relative_pointer, delegate_seat, delegate_shm,
+    delegate_relative_pointer, delegate_seat, delegate_shm, delegate_touch,
     output::{OutputHandler, OutputState},
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
@@ -32,6 +32,7 @@ use smithay_client_toolkit::{
             CursorIcon, PointerEvent, PointerEventKind, PointerHandler, ThemeSpec, ThemedPointer,
         },
         relative_pointer::{RelativeMotionEvent, RelativePointerHandler, RelativePointerState},
+        touch::TouchHandler,
     },
     shell::{
         WaylandSurface,
@@ -47,6 +48,7 @@ use smithay_client_toolkit::{
 };
 use tracing::{debug, error, info, warn};
 use wayland_client::protocol::wl_shm::Format;
+use wayland_client::protocol::wl_touch::WlTouch;
 use wayland_client::{
     Connection, Dispatch, QueueHandle,
     globals::registry_queue_init,
@@ -322,6 +324,8 @@ fn run(reader_stream: UnixStream, writer: EventWriter, initial_layer: Layer) -> 
         output_size: (0, 0),
         scale: 1,
         pointer: None,
+        touch: None,
+        last_touch: (0.0, 0.0),
         themed_pointer: None,
         relative_pointer: None,
         drag: None,
@@ -411,6 +415,8 @@ struct Overlay {
     output_size: (i32, i32),
     scale: i32,
     pointer: Option<wl_pointer::WlPointer>,
+    touch: Option<WlTouch>,
+    last_touch: (f64, f64),
     themed_pointer: Option<ThemedPointer>,
     relative_pointer: Option<ZwpRelativePointerV1>,
     drag: Option<DragState>,
@@ -1013,6 +1019,11 @@ impl SeatHandler for Overlay {
         seat: wl_seat::WlSeat,
         capability: Capability,
     ) {
+        if capability == Capability::Touch && self.touch.is_none() {
+            if let Ok(touch) = self.seat_state.get_touch(qh, &seat) {
+                self.touch = Some(touch);
+            }
+        }
         if capability == Capability::Pointer && self.pointer.is_none() {
             let surface = self.compositor.create_surface(qh);
             if let Ok(themed) = self.seat_state.get_pointer_with_theme(
@@ -1191,6 +1202,82 @@ impl Dispatch<wl_region::WlRegion, ()> for Overlay {
     }
 }
 
+impl TouchHandler for Overlay {
+    fn down(
+        &mut self,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        _: &WlTouch,
+        _: u32,
+        time: u32,
+        surface: wl_surface::WlSurface,
+        _: i32,
+        position: (f64, f64),
+    ) {
+        if &surface != self.layer.wl_surface() {
+            return;
+        }
+        self.last_touch = position;
+        self.send_pointer(
+            PointerEventName::Down,
+            position.0,
+            position.1,
+            Some(0x110),
+            Some(time),
+        );
+    }
+
+    fn up(
+        &mut self,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        _: &WlTouch,
+        _: u32,
+        time: u32,
+        _: i32,
+    ) {
+        self.send_pointer(
+            PointerEventName::Up,
+            self.last_touch.0,
+            self.last_touch.1,
+            Some(0x110),
+            Some(time),
+        );
+    }
+
+    fn motion(
+        &mut self,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        _: &WlTouch,
+        time: u32,
+        _: i32,
+        position: (f64, f64),
+    ) {
+        self.last_touch = position;
+        self.send_pointer(
+            PointerEventName::Motion,
+            position.0,
+            position.1,
+            None,
+            Some(time),
+        );
+    }
+
+    fn cancel(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &WlTouch) {}
+    fn shape(
+        &mut self,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        _: &WlTouch,
+        _: i32,
+        _: f64,
+        _: f64,
+    ) {
+    }
+    fn orientation(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &WlTouch, _: i32, _: f64) {}
+}
+
 delegate_compositor!(Overlay);
 delegate_output!(Overlay);
 delegate_shm!(Overlay);
@@ -1198,4 +1285,5 @@ delegate_seat!(Overlay);
 delegate_pointer!(Overlay);
 delegate_relative_pointer!(Overlay);
 delegate_layer!(Overlay);
+delegate_touch!(Overlay);
 delegate_registry!(Overlay);
