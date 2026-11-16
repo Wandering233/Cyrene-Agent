@@ -257,7 +257,7 @@ export class PetOverlayController {
         if (generation === this.hostGeneration) this.handleHostFailure(error);
       },
       onLog: (message) => console.log("[PetOverlayHost]", message),
-    });
+    }, this.alwaysOnTop ? [] : ["--layer", "bottom"]);
     this.host = host;
 
     try {

@@ -102,7 +102,7 @@ fn main() -> Result<()> {
         .with_writer(std::io::stderr)
         .init();
 
-    let socket_path = parse_socket_path()?;
+    let (socket_path, initial_layer) = parse_args()?;
     info!("connecting to Electron socket {}", socket_path.display());
     let stream = connect_with_retry(&socket_path)?;
     let writer = EventWriter::new(stream.try_clone().context("clone socket")?);
@@ -110,6 +110,7 @@ fn main() -> Result<()> {
     if let Err(err) = run(
         stream.try_clone().context("clone reader socket")?,
         writer.clone(),
+        initial_layer,
     ) {
         writer.send(&HostEvent::Error {
             code: "HOST_FAILED".into(),
@@ -120,24 +121,38 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn parse_socket_path() -> Result<PathBuf> {
+fn parse_args() -> Result<(PathBuf, Layer)> {
+    let mut socket = None;
+    let mut layer = Layer::Top;
     let mut args = env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--socket" => {
-                let path = args
-                    .next()
-                    .ok_or_else(|| anyhow!("--socket requires a path"))?;
-                return Ok(PathBuf::from(path));
+                socket = Some(PathBuf::from(
+                    args.next()
+                        .ok_or_else(|| anyhow!("--socket requires a path"))?,
+                ));
+            }
+            "--layer" => {
+                layer = match args.next().as_deref() {
+                    Some("overlay") => Layer::Overlay,
+                    Some("bottom") => Layer::Bottom,
+                    Some("top") | None => Layer::Top,
+                    Some(other) => bail!("unknown layer: {other}"),
+                };
             }
             "--help" | "-h" => {
-                println!("Usage: cyrene-overlay-host --socket <unix-socket-path>");
+                println!(
+                    "Usage: cyrene-overlay-host --socket <unix-socket-path> [--layer top|overlay|bottom]"
+                );
                 std::process::exit(0);
             }
             other => bail!("unknown argument: {other}"),
         }
     }
-    bail!("missing --socket <unix-socket-path>")
+    socket
+        .map(|path| (path, layer))
+        .ok_or_else(|| anyhow!("missing --socket <unix-socket-path>"))
 }
 
 fn connect_with_retry(path: &PathBuf) -> Result<UnixStream> {
@@ -235,7 +250,7 @@ fn spawn_reader(stream: UnixStream, sender: Sender<Inbound>) {
     });
 }
 
-fn run(reader_stream: UnixStream, writer: EventWriter) -> Result<()> {
+fn run(reader_stream: UnixStream, writer: EventWriter, initial_layer: Layer) -> Result<()> {
     let conn = Connection::connect_to_env().context("connect to Wayland display")?;
     let (globals, event_queue) = registry_queue_init(&conn).context("enumerate Wayland globals")?;
     let qh = event_queue.handle();
@@ -259,7 +274,7 @@ fn run(reader_stream: UnixStream, writer: EventWriter) -> Result<()> {
 
     let surface = compositor.create_surface(&qh);
     let layer =
-        layer_shell.create_layer_surface(&qh, surface, Layer::Top, Some("cyrene-overlay"), None);
+        layer_shell.create_layer_surface(&qh, surface, initial_layer, Some("cyrene-overlay"), None);
     layer.set_anchor(Anchor::TOP | Anchor::LEFT);
     layer.set_keyboard_interactivity(KeyboardInteractivity::None);
     layer.set_exclusive_zone(-1);
@@ -286,7 +301,7 @@ fn run(reader_stream: UnixStream, writer: EventWriter) -> Result<()> {
         compositor,
         layer_shell,
         layer,
-        layer_kind: Layer::Top,
+        layer_kind: initial_layer,
         pool,
         buffers,
         width: DEFAULT_WIDTH,
@@ -498,6 +513,7 @@ impl Overlay {
                 let target = match layer.as_str() {
                     "overlay" => Layer::Overlay,
                     "top" | "" => Layer::Top,
+                    "bottom" => Layer::Bottom,
                     other => {
                         warn!("unknown layer {other:?}; keeping current layer");
                         return;

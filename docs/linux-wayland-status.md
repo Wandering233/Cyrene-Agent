@@ -3,6 +3,10 @@
 > 生成于 2026-11-16，对应 `docs/linux-wayland-remaining-tasks.md` 的 86 项清单。
 > 状态只记录实际代码、单测或实机证据；未验证项不标完成。
 
+## 验证范围
+
+按用户指定，**不执行 GNOME/KDE/Sway/COSMIC 跨桌面验证**；以下结果均只来自 Hyprland。相关任务在清单中标注“仅 Hyprland/未跨 DE”。
+
 ## 汇总
 
 - 已完成：27 项
@@ -27,8 +31,8 @@
 
 ## 明确阻塞 / 未完成原因
 
-1. **GNOME/Mutter、KDE、Sway、COSMIC 实机 E2E 缺失**  
-   当前环境只有 Hyprland；无法真实验证顶栏/概览副作用、KWin/Sway layer-shell 差异。
+1. **跨 DE 验证按用户要求不做**  
+   仅 Hyprland；GNOME/Mutter、KDE、Sway、COSMIC 相关项保持未验证，不因 Hyprland 通过而标完成。
 2. **SRT Linux 网络 allowlist 未打通**  
    host proxy 正常，sandbox 内 CONNECT 无响应；SBX-05 未完成，不能宣称网络沙箱可用。
 3. **分数缩放 1.25/1.5 实机缺失**  

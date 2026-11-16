@@ -45,6 +45,7 @@ export class PetOverlayHostClient {
   constructor(
     private readonly binaryPath: string,
     callbacks: OverlayHostCallbacks,
+    private readonly extraArgs: string[] = [],
   ) {
     this.socketPath = path.join(
       os.tmpdir(),
@@ -80,7 +81,7 @@ export class PetOverlayHostClient {
       this.waiter = { resolve, reject, timer };
     });
 
-    const child = spawn(this.binaryPath, ["--socket", this.socketPath], {
+    const child = spawn(this.binaryPath, ["--socket", this.socketPath, ...this.extraArgs], {
       stdio: ["ignore", "ignore", "pipe"],
       env: process.env,
     });

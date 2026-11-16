@@ -3,7 +3,14 @@
 > 基线：`e42a45b4 feat(跨平台): 增加 Linux Wayland 原生桌宠 overlay`
 > 环境：Arch Linux + Hyprland 0.57.1 + Wayland，Electron 44.7.2
 > 说明：本文是**全量任务清单与逐项核对结果**；已完成项会随实现更新。
-> 最近更新：OVL-13；验收状态汇总；overlay soak；overlay 帧统计；Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
+> 最近更新：仅 Hyprland 范围；OVL-09 bottom layer；OVL-13；验收状态汇总；overlay soak；overlay 帧统计；Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
+
+
+## 验证范围（按用户指定）
+
+- **不做 GNOME/KDE/Sway/COSMIC 跨桌面验证**；这些环境没有实机证据。
+- 相关任务只记录 Hyprland 结果，并明确标注“仅 Hyprland / 未跨 DE”。
+- 跨 DE 未验证不视为完成，也不因 Hyprland 通过而标 ✅。
 
 ## 状态图例
 
@@ -31,15 +38,15 @@
 
 | ID | 状态 | 任务 | 核对证据/现状 | 剩余工作与验收 | 优先级 |
 |---|---|---|---|---|---|
-| OVL-01 | 🟡 | GNOME 全屏透明 `xdg_toplevel` fallback | 新增 `cyrene-overlay-fullscreen`：xdg_toplevel 全屏 + 透明全屏 buffer；Hyprland 强制 fullscreen 实测 client fullscreen=2、2238x1492、宠物在 900,400 | GNOME/Mutter 实机；多屏坐标 | P0 |
-| OVL-02 | 🟡 | GNOME 全屏父 surface + 子 surface/局部 buffer | 当前使用全屏 ARGB buffer（透明底 + 宠物区域拷贝/damage），未用 subsurface | 4K 带宽优化；subsurface/局部 buffer | P0 |
-| OVL-03 | ❌ | GNOME 全屏态副作用 | 未处理 | 顶栏、概览、全屏提示、idle inhibit 验证 | P0 |
+| OVL-01 | 🟡 | GNOME 全屏透明 `xdg_toplevel` fallback | 仅 Hyprland 强制 fullscreen 实测（client fullscreen=2、2238x1492、宠物 900,400）；GNOME/Mutter 未跨 DE 验证 | 仅 Hyprland；跨 DE 不做 | P0 |
+| OVL-02 | 🟡 | GNOME 全屏父 surface + 子 surface/局部 buffer | 仅 Hyprland 全屏 ARGB buffer（宠物区域拷贝/damage），未用 subsurface；未跨 DE | 4K 带宽优化；subsurface/局部 buffer | P0 |
+| OVL-03 | ❌ | GNOME 全屏态副作用 | 未处理；仅 Hyprland fullscreen 路径，未跨 DE | 顶栏、概览、全屏提示、idle inhibit；仅 Hyprland | P0 |
 | OVL-04 | ✅ | HiDPI buffer scale | 真实 HEADLESS output scale=2 实机：layer 400x500、buffer 800x1000；强制 2x 穿透/点击也验证 | 已验收 | P0 |
 | OVL-05 | 🟡 | 分数缩放 1.25/1.5 | 使用 `ceil(scale)` 整数超采样（1.25/1.5→2x），逻辑坐标不变 | 真实 1.25/1.5 输出实机；非整数 buffer_scale 替代方案 | P0 |
 | OVL-06 | ✅ | 按 `init.output` 选择输出 | 实机在 HEADLESS-1/2（x=2238, scale=2）创建 layer，位于 [2500,100]；输出名匹配/重建有效 | 多屏互切归 OVL-07/27 | P0 |
 | OVL-07 | 🟡 | 多屏热插拔/位置持久化 | 按输出位置持久化实测通过；host 新增 output_destroyed 迁移到剩余输出逻辑 | 输出移除/重连实机复测（当前 headless 删除时序不稳定）；多屏互拖 | P0 |
 | OVL-08 | ❌ | 跨输出拖拽 | 拖拽只改 margin，不换输出 | 跨屏 surface 迁移/坐标重算 | P1 |
-| OVL-09 | 🟡 | `petAlwaysOnTop=false` 语义 | 已能切 `TOP`/`OVERLAY`，但关闭仍是 `TOP` | 普通层级模式或明确文档化限制 | P1 |
+| OVL-09 | ✅ | `petAlwaysOnTop=false` 语义 | 宿主新增 `--layer`；启动时 false 创建 `Layer::Bottom` 实测；运行中切换需重启 | 启动语义已验收 | P1 |
 | OVL-10 | 🟡 | 全屏/锁屏/通知 z-order | 只验证普通窗口 | 全屏游戏、锁屏、通知中心、面板遮挡 | P1 |
 | OVL-11 | ✅ | 宿主崩溃自动重启/watchdog | 3 次退避重启（500/1500/3000ms）；实测 kill -9 后新宿主启动、layer/位置恢复；不可恢复错误直接回退 | 长时间 watchdog 仍可加强 | P1 |
 | OVL-12 | 🟡 | 协议版本握手/能力协商 | 宿主错误事件 `PROTOCOL_MISMATCH` 客户端测试通过；init 携带 protocol | 真实宿主不匹配端到端 | P1 |
@@ -57,7 +64,7 @@
 | OVL-24 | ❌ | arm64/多架构 | 只构建当前 x64 | arm64 交叉构建/打包 | P1 |
 | OVL-25 | ❌ | CI 构建宿主/校验和 | 只有本地脚本 | GitHub Actions 安装 Rust、构建、校验 | P1 |
 | OVL-26 | ❌ | AppImage glibc/依赖兼容 | 本机 Arch 构建 | 旧发行版验证；libwayland 依赖声明 | P1 |
-| OVL-27 | ❌ | KDE/Sway/GNOME/多屏 E2E | 只测 Hyprland | 每类合成器实机用例 | P0 |
+| OVL-27 | ❌ | KDE/Sway/GNOME/多屏 E2E | 按用户要求不做跨 DE；仅 Hyprland 已验证 | 跨 DE 不验；仅 Hyprland | P0 |
 
 ---
 
@@ -65,25 +72,25 @@
 
 | ID | 状态 | 任务 | 核对证据/现状 | 剩余工作与验收 | 优先级 |
 |---|---|---|---|---|---|
-| SHOT-01 | 🟡 | portal Screenshot v2 | `portal-screenshot.ts` 可在 Electron 运行；修复 dbus-next/usocket 在 Electron Node 24 的崩溃（util.isError/原生 socket） | Hyprland portal 非交互仍返回 2；其他 DE 实机/交互返回 0 | P0 |
+| SHOT-01 | 🟡 | portal Screenshot v2 | 仅 Hyprland：Electron 内 portal 可运行、非交互返回 2，grim 回退；未跨 DE | 仅 Hyprland；其他 DE 未验 | P0 |
 | SHOT-02 | 🟡 | 全屏/区域/窗口截图 | Hyprland：grim 全屏实测、slurp 选择取消路径实测；区域选择成功待人工 | 窗口截图/多屏 | P0 |
 | SHOT-03 | ✅ | 标注 overlay | 新增 Electron 标注窗口（画笔/矩形/箭头/撤销/清空/保存/取消）；自动化保存实测生成同尺寸 annotated PNG | 文字/马赛克可后续 | P0 |
 | SHOT-04 | ✅ | 剪贴板/文件保存 | 截图/标注写入 userData/screenshots；热键 ClipboardItem 写剪贴板（Electron 实测读回 image/png）；标注保存实测 | 已验收 | P0 |
 | SHOT-05 | 🟡 | 多屏/HiDPI 截图 | HEADLESS 2x 输出加入后 grim 全屏截图 6396×2984，包含多输出；区域坐标/单输出选择待验证 | 区域跨屏、缩放换算 | P0 |
-| SHOT-06 | 🟡 | DE 兜底 | Hyprland grim/slurp 已实现；其他 DE 走 portal | KDE Spectacle/GNOME DBus、grim 缺失回退 | P1 |
+| SHOT-06 | 🟡 | DE 兜底 | 仅 Hyprland grim/slurp；其他 DE 未跨 DE 验证 | 仅 Hyprland；其他 DE 未验 | P1 |
 | SHOT-07 | ✅ | 全局截图热键 | Hyprland 自动 `hl.bind("ALT+SHIFT+S")` → control socket → grim；实机按键生成 949KB PNG；Electron globalShortcut 在 Wayland 不可靠时由桌面 bind 兜底 | KDE/GNOME portal 仍待适配 | P0 |
 | SHOT-08 | 🟡 | 权限/隐私/临时文件 | 截图文件 0600；portal 原文件删除；启动清理 7 天/100 个上限；单测覆盖 | 权限提示/失败清理边界 | P1 |
 | TOAST-01 | ✅ | Toast 使用原生 overlay host | 真实主应用 `control toast-test` 触发：offscreen toast 页 → layer host，内容截图有 1229 色；普通 BrowserWindow 仍为 fallback | 已验收 | P0 |
 | TOAST-02 | ✅ | Toast 光标/角落定位 | 实测 layer 位于 [1798,1392,440,100]（右下角）；高度协议 28/58/100 正常 | 已验收 | P0 |
 | TOAST-03 | ✅ | Toast 穿透/点击 | 点击卡片中心后聊天窗口被激活（`昔涟 · 聊天（React）`）；host alpha input region + 指针转发生效 | 已验收 | P0 |
-| GS-01 | 🟡 | 直接接 GlobalShortcuts portal | portal 注册/`hyprctl globalshortcuts` 出现 `cyrene:screenshot`；低层 Activated 参数已修正，`gdbus` 合成信号可触发监听 | 绑定 pending/真实按键未完成；KDE/GNOME 验证 | P0 |
+| GS-01 | 🟡 | 直接接 GlobalShortcuts portal | 仅 Hyprland：portal 注册成功、合成 Activated 可触发；绑定 pending/真实按键未完成；未跨 DE | 仅 Hyprland；跨 DE 不做 | P0 |
 | GS-02 | ❌ | 授权/冲突/拒绝 | 无 | 首次授权、冲突提示、禁用状态 | P0 |
 | GS-03 | ❌ | 真实按键触发验证 | `register()` true，合成按键未触发 | 真实按键/portal 事件测试 | P0 |
 | GS-04 | ❌ | per-DE 兜底 | 无 | Hyprland dynamic bind、KDE、Sway、GNOME | P1 |
 | GS-05 | ❌ | 快捷键设置 UI/持久化 | 只有截图 accelerator 注册 | 录制快捷键、冲突检测、保存 | P1 |
 | TRAY-01 | ✅ | StatusNotifier 宿主检测 | 新增 `tray/tray-host.ts`，启动用 gdbus `NameHasOwner` 探测；单测覆盖；本机 quickshell 返回 true | 无宿主实机验证降级日志 | P0 |
 | TRAY-02 | ✅ | 无托盘降级入口 | 新增 `cyrene control` CLI + `$XDG_RUNTIME_DIR/cyrene-control.sock`（0600）；实测 `control show-chat` 打开聊天窗 | 已验收 | P0 |
-| TRAY-03 | ❌ | GNOME AppIndicator 提示 | 无 | 检测扩展/提示安装 | P1 |
+| TRAY-03 | ❌ | GNOME AppIndicator 提示 | 未做；按用户要求不跨 DE | 仅 Hyprland；跨 DE 不做 | P1 |
 | FOCUS-01 | ❌ | `xdg-activation` 支持 | 只有应用内 activation broker | 获取/使用 activation token | P0 |
 | FOCUS-02 | ❌ | 后台主动弹窗焦点 | 依赖 `show()/focus()` | 通知/激活 token；不抢焦点策略 | P0 |
 | FOCUS-03 | ✅ | 第二实例激活 | 实机第二实例退出后，第一实例打开聊天窗（`昔涟 · 聊天（React）`） | 已验收 | P1 |
@@ -113,15 +120,15 @@
 | SBX-06 | 🟡 | AppArmor/userns 检测 | 新增 `/proc/sys/kernel/apparmor_restrict_unprivileged_userns` 检测并写启动警告；单测覆盖 | Ubuntu 24.04 实机复现/修复指引 | P1 |
 | SBX-07 | ✅ | fail-closed 错误/测试 | 缺 socat 时 not_ready；补齐依赖后真实 bwrap 命令成功；单测覆盖两条路径 | 已验收 | P1 |
 | SBX-08 | ✅ | GUI 命令 Wayland socket | 实机 bwrap 内可访问 `/run/user/1000/wayland-1` 与 lock 文件，`WAYLAND_DISPLAY=wayland-1` | 已验收 | P2 |
-| WIN-01 | ❌ | 普通窗口定位/居中/恢复 | `toast-window.ts` 用 `setBounds`；Wayland 无效 | 宿主化或接受合成器放置 | P1 |
-| WIN-02 | ❌ | 普通窗口置顶 | `setAlwaysOnTop` 原生 Wayland 无效 | 仅桌宠有方案；普通窗口需 layer-shell/扩展 | P1 |
+| WIN-01 | ❌ | 普通窗口定位/居中/恢复 | 仅 Hyprland 已知 `setBounds` 无效，未修复；未跨 DE | 仅 Hyprland | P1 |
+| WIN-02 | ❌ | 普通窗口置顶 | 仅 Hyprland 已知 `setAlwaysOnTop` 无效，未修复；未跨 DE | 仅 Hyprland | P1 |
 | WIN-03 | 🟡 | 全局光标查询 | Electron 返回 0,0；新增 Hyprland `hyprctl -j cursorpos` 回退（100ms 缓存），用于 toast/窗口显示器选择 | 其他 DE/InputCapture；真实多屏光标 | P1 |
-| WIN-04 | ❌ | 透明/焦点/激活 | 未系统验证 | 透明窗口、后台激活、焦点窃取 | P1 |
-| WIN-05 | ❌ | 剪贴板/文件选择/拖放/密钥环 | 未做 Wayland 回归 | 逐项验证并修复 | P1 |
-| WIN-06 | ❌ | 屏幕录制/desktopCapturer | 未验证 | PipeWire/ScreenCast/restore token | P2 |
-| WIN-07 | ❌ | X11 回归 | overlay 改动后未跑 X11 实机 | X11 普通路径全量回归 | P1 |
+| WIN-04 | ❌ | 透明/焦点/激活 | 未系统验证；仅 Hyprland 范围 | 仅 Hyprland | P1 |
+| WIN-05 | ❌ | 剪贴板/文件选择/拖放/密钥环 | 未做 Wayland 回归；仅 Hyprland 范围 | 仅 Hyprland | P1 |
+| WIN-06 | ❌ | 屏幕录制/desktopCapturer | 未验证；仅 Hyprland 范围 | 仅 Hyprland | P2 |
+| WIN-07 | ❌ | X11 回归 | 未跑 X11；按用户要求仅 Hyprland | 仅 Hyprland | P1 |
 | DOC-01 | ✅ | 安装/排障/升级文档 | 新增 `docs/linux-troubleshooting.md`：依赖、构建、doctor、控制通道、已知问题 | 已验收 | P1 |
-| DOC-02 | 🟡 | DE 支持矩阵 | 文档新增 Hyprland/KDE/Sway/GNOME 矩阵，标注实测/预期/待 E2E | KDE/Sway/GNOME/COSMIC 实机 | P1 |
+| DOC-02 | 🟡 | DE 支持矩阵 | 文档矩阵仅 Hyprland 实测，其他标注未跨 DE 验证 | 仅 Hyprland；跨 DE 不做 | P1 |
 | DOC-03 | ✅ | 诊断命令 | `cyrene doctor` 输出会话/桌面/依赖/宿主/截图目录；单测覆盖；实机输出正常 | 日志导出可后续 | P2 |
 
 ---
@@ -131,7 +138,7 @@
 | ID | 状态 | 任务 | 核对证据/现状 | 剩余工作与验收 | 优先级 |
 |---|---|---|---|---|---|
 | QA-01 | 🟡 | 宿主集成测试 | 新增 `host-client.test.ts` 假宿主：ready/init/pointer/cleanup；Rust 单测保留 | 假 compositor、输入区域断言 | P0 |
-| QA-02 | ❌ | 合成器 E2E 矩阵 | 只测 Hyprland | KDE/Sway/GNOME/多屏/4K | P0 |
+| QA-02 | ❌ | 合成器 E2E 矩阵 | 按用户要求不做跨 DE；仅 Hyprland 测试 | 仅 Hyprland；跨 DE 不做 | P0 |
 | QA-03 | 🟡 | 性能/内存/句柄泄漏 | 新增 `verify:linux-overlay-soak`：12s 实测 RSS 392→418MB（+6.8%）、fd 156→155；非长跑 | 长跑/CPU/延迟/4K | P1 |
 | QA-04 | 🟡 | 失败路径 | 新增宿主协议错、启动超时测试；启动/停止/0600 已覆盖 | socket 拒绝/崩溃恢复端到端 | P1 |
 | QA-05 | 🟡 | 协议 fuzz/边界 | Rust 边界测试覆盖 stride 溢出/零 stride；Jet 边界畸形帧仍待补 | 畸形帧/半包/乱序 fuzz | P2 |
