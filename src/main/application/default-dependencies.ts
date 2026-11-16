@@ -107,6 +107,8 @@ import { registerBrowserPanelIpc } from "../browser/browser-panel-ipc";
 import { registerMomentsIpc } from "../moments/moments-ipc";
 import { registerChatUiIpc, getActiveChatSessionId } from "../chats/chat-ui-ipc";
 import { createToastWindowController } from "../toast/toast-window";
+import { createToastOverlayController } from "../toast/toast-overlay";
+import { resolveOverlayBackend, shouldUsePetOverlay } from "../pet-overlay";
 import { createToastService } from "../toast/toast-service";
 import { toastEvents } from "../toast/toast-events";
 import { createToastWindowShell } from "../windows/create-toast-window";
@@ -844,6 +846,26 @@ export function createDefaultApplicationDependencies(): ApplicationDependencies 
           getChatWindow: () => reactChatWindow,
           getDisplayMatching: (bounds) => screen.getDisplayMatching(bounds),
           getCursorScreenPoint: () => screen.getCursorScreenPoint(),
+          createOverlayController: () => {
+            if (process.platform !== "linux" || !shouldUsePetOverlay() || resolveOverlayBackend() !== "layer") {
+              return null;
+            }
+            try {
+              return createToastOverlayController({
+                isDev,
+                resolveDisplay: () => {
+                  const chat = reactChatWindow;
+                  const display = chat && !chat.isDestroyed()
+                    ? screen.getDisplayMatching(chat.getBounds())
+                    : screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+                  return { workArea: display.workArea, label: display.label };
+                },
+              });
+            } catch (error) {
+              console.warn("[ToastOverlay] unavailable:", error instanceof Error ? error.message : String(error));
+              return null;
+            }
+          },
         });
         const toastService = createToastService({
           bus: toastEvents,

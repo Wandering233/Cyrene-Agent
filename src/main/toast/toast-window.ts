@@ -29,6 +29,16 @@ export interface ToastWindowDeps {
   getDisplayMatching(bounds: ToastBounds): { workArea: ToastDisplayWorkArea };
   /** 鼠标所在位置（electron screen.getCursorScreenPoint 的注入形式） */
   getCursorScreenPoint(): { x: number; y: number };
+  /** Optional native Wayland overlay backend (Linux layer-shell path). */
+  createOverlayController?(): {
+    updateHeight(height: number): void;
+    syncVisibility(hasToasts: boolean): void;
+    send(channel: string, payload: unknown): void;
+    preload(): void;
+    isVisible(): boolean;
+    owns(webContents: { id: number }): boolean;
+    dispose(): void;
+  } | null;
 }
 
 /**
@@ -36,6 +46,8 @@ export interface ToastWindowDeps {
  * 窗口常驻不销毁；队列空整窗 hide，非空时按内容高度贴显示器右下角 showInactive。
  */
 export function createToastWindowController(deps: ToastWindowDeps) {
+  const overlay = deps.createOverlayController?.();
+  if (overlay) return overlay;
   let window: BrowserWindow | null = null;
   /** 聊天窗口最近一次的区域：窗口销毁后仍用该区域匹配显示器（toast 继续在那块屏幕弹出） */
   let lastChatBounds: ToastBounds | null = null;

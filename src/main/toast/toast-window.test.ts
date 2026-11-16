@@ -122,3 +122,22 @@ describe("createToastWindowController · 定位与显隐", () => {
     expect(win.isVisible()).toBe(true);
   });
 });
+
+describe("createToastWindowController · Wayland overlay", () => {
+  it("uses the injected overlay controller without creating a BrowserWindow", () => {
+    const overlay = {
+      updateHeight: vi.fn(), syncVisibility: vi.fn(), send: vi.fn(),
+      preload: vi.fn(), isVisible: () => false, owns: () => false, dispose: vi.fn(),
+    };
+    const createWindow = vi.fn();
+    const controller = createToastWindowController({
+      createWindow,
+      getChatWindow: () => null,
+      getDisplayMatching: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }),
+      getCursorScreenPoint: () => ({ x: 0, y: 0 }),
+      createOverlayController: () => overlay,
+    });
+    expect(controller).toBe(overlay);
+    expect(createWindow).not.toHaveBeenCalled();
+  });
+});

@@ -73,9 +73,9 @@
 | SHOT-06 | 🟡 | DE 兜底 | Hyprland grim/slurp 已实现；其他 DE 走 portal | KDE Spectacle/GNOME DBus、grim 缺失回退 | P1 |
 | SHOT-07 | ✅ | 全局截图热键 | Hyprland 自动 `hl.bind("ALT+SHIFT+S")` → control socket → grim；实机按键生成 949KB PNG；Electron globalShortcut 在 Wayland 不可靠时由桌面 bind 兜底 | KDE/GNOME portal 仍待适配 | P0 |
 | SHOT-08 | 🟡 | 权限/隐私/临时文件 | 截图文件 0600；portal 原文件删除；启动清理 7 天/100 个上限；单测覆盖 | 权限提示/失败清理边界 | P1 |
-| TOAST-01 | ❌ | Toast 使用原生 overlay host | `toast-window.ts` 仍是普通 BrowserWindow | 复用 offscreen + host | P0 |
-| TOAST-02 | ❌ | Toast 光标/角落定位 | `setBounds` 在原生 Wayland 无效；光标 0,0 | 宿主定位或系统通知 | P0 |
-| TOAST-03 | ❌ | Toast 穿透/点击 | 普通窗口整窗可交互 | input region | P0 |
+| TOAST-01 | 🟡 | Toast 使用原生 overlay host | 新增 `toast-overlay.ts`：offscreen toast 页 + layer host；普通 BrowserWindow 仍为 fallback | 内容渲染/生命周期与主 service 联调 | P0 |
+| TOAST-02 | 🟡 | Toast 光标/角落定位 | layer host 实测位于 [1798,1342,440,150]（右下角）；多屏/HiDPI 待验证 | 多屏、缩放、内容高度 | P0 |
+| TOAST-03 | 🟡 | Toast 穿透/点击 | 复用 host alpha input region 与指针转发 | 实际卡片点击/穿透联调 | P0 |
 | GS-01 | 🟡 | 直接接 GlobalShortcuts portal | 新增 portal 客户端；打包版 + desktop 文件实测 `hyprctl globalshortcuts` 出现 `cyrene:screenshot`；dev 无 app id 自动回退 | Activated 信号未在 uinput 合成键下触发；真实按键/KDE/GNOME 验证 | P0 |
 | GS-02 | ❌ | 授权/冲突/拒绝 | 无 | 首次授权、冲突提示、禁用状态 | P0 |
 | GS-03 | ❌ | 真实按键触发验证 | `register()` true，合成按键未触发 | 真实按键/portal 事件测试 | P0 |
