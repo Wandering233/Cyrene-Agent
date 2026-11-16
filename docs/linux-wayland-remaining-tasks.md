@@ -3,7 +3,7 @@
 > 基线：`e42a45b4 feat(跨平台): 增加 Linux Wayland 原生桌宠 overlay`
 > 环境：Arch Linux + Hyprland 0.57.1 + Wayland，Electron 44.7.2
 > 说明：本文是**全量任务清单与逐项核对结果**；已完成项会随实现更新。
-> 最近更新：Toast 键盘可达性；OVL-16 延迟指标；QA-01 宿主集成测试验收；协议校验脚本；UPD-01 本地 feed 验收；OVL-12 协议不匹配 e2e；SHOT-02 窗口截图验收；窗口截图目标；GS-01/GS-04 验收；SHOT-05 多屏截图验收；slurp 选区修复；打包校验和校验；DE 矩阵文档验收；协议 fuzz/reduced motion；宿主校验和；WIN-03 Hyprland 光标回退验收；主题指针；clickCount 单测；QA-04 失败路径；仅 Hyprland 范围；OVL-09 bottom layer；OVL-13；验收状态汇总；overlay soak；overlay 帧统计；Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
+> 最近更新：60s soak/隐藏渲染验收；Toast 键盘可达性；OVL-16 延迟指标；QA-01 宿主集成测试验收；协议校验脚本；UPD-01 本地 feed 验收；OVL-12 协议不匹配 e2e；SHOT-02 窗口截图验收；窗口截图目标；GS-01/GS-04 验收；SHOT-05 多屏截图验收；slurp 选区修复；打包校验和校验；DE 矩阵文档验收；协议 fuzz/reduced motion；宿主校验和；WIN-03 Hyprland 光标回退验收；主题指针；clickCount 单测；QA-04 失败路径；仅 Hyprland 范围；OVL-09 bottom layer；OVL-13；验收状态汇总；overlay soak；overlay 帧统计；Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
 
 
 ## 验证范围（按用户指定）
@@ -60,7 +60,7 @@
 | OVL-20 | ❌ | 触摸/触控笔 | 只处理 pointer | touch/stylus 适配 | P2 |
 | OVL-21 | ❌ | 键盘/IME（桌宠菜单） | `keyboard_interactivity=None`，无键盘转发 | 需要键盘时的独立模式或普通窗口 | P2 |
 | OVL-22 | ❌ | input region 精度/CPU | 4px 网格、每帧扫描 | 轮廓简化/增量更新/基准 | P2 |
-| OVL-23 | 🟡 | 不可见时停止渲染 | 隐藏时帧率 60→2、不再向宿主发帧；show 时恢复 60 并补发最新帧 | 完全暂停 Live2D/锁屏遮挡通知 | P2 |
+| OVL-23 | ✅ | 不可见时停止渲染 | 隐藏时帧流停止、offscreen 60→2fps；show 恢复 60 并补发最新帧；无锁屏/遮挡通知 | 已验收（帧流停止） | P2 |
 | OVL-24 | ❌ | arm64/多架构 | 只构建当前 x64 | arm64 交叉构建/打包 | P1 |
 | OVL-25 | 🟡 | CI 构建宿主/校验和 | 构建脚本生成 `SHA256SUMS`；CI native job 执行 `sha256sum -c`；尚未实跑远程 CI | 远程 CI 首跑 | P1 |
 | OVL-26 | ❌ | AppImage glibc/依赖兼容 | 本机 Arch 构建 | 旧发行版验证；libwayland 依赖声明 | P1 |
@@ -139,7 +139,7 @@
 |---|---|---|---|---|---|
 | QA-01 | ✅ | 宿主集成测试 | 假宿主 ready/init/pointer/失败路径 + 真实宿主协议不匹配 e2e + alpha input region 单测；未做假 compositor | 已验收（无假 compositor） | P0 |
 | QA-02 | ❌ | 合成器 E2E 矩阵 | 按用户要求不做跨 DE；仅 Hyprland 测试 | 仅 Hyprland；跨 DE 不做 | P0 |
-| QA-03 | 🟡 | 性能/内存/句柄泄漏 | 新增 `verify:linux-overlay-soak`：12s 实测 RSS 392→418MB（+6.8%）、fd 156→155；非长跑 | 长跑/CPU/延迟/4K | P1 |
+| QA-03 | 🟡 | 性能/内存/句柄泄漏 | 60s soak：RSS 617→578MB（-6.4%）、fd 154→163；帧延迟 1ms；CPU/4K/更长跑未测 | CPU/4K/长跑 | P1 |
 | QA-04 | ✅ | 失败路径 | fake host 覆盖：协议错、启动超时、二进制 spawn 失败、ready 前退出；0600/停止/清理 | 已验收（Hyprland fake host） | P1 |
 | QA-05 | 🟡 | 协议 fuzz/边界 | 确定性随机 JSON 2000 例解析不 panic；stride/尺寸边界；半包/乱序仍待 | 半包/乱序/host 端 fuzz | P2 |
 | QA-06 | 🟡 | 打包产物测试 | AppImage 实机 + autostart；`verify:linux-artifacts` 校验 AppImage/latest-linux.yml/两个宿主/打包 SHA256SUMS | 多架构、真实升级 | P1 |
