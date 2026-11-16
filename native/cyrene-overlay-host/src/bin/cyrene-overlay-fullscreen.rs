@@ -423,6 +423,7 @@ impl State {
             .and_then(|o| self.output_state.info(o).and_then(|i| i.name));
         self.writer.send(&HostEvent::Ready {
             protocol: PROTOCOL_VERSION,
+            version: env!("CARGO_PKG_VERSION").to_string(),
             width: self.pet_w,
             height: self.pet_h,
             output: name,

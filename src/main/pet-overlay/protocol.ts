@@ -9,6 +9,7 @@
  */
 
 export const PROTOCOL_VERSION = 1;
+export const OVERLAY_HOST_VERSION = "0.1.0";
 
 export interface InitMessage {
   type: "init";
@@ -78,6 +79,7 @@ export interface FrameHeader {
 export interface ReadyEvent {
   type: "ready";
   protocol: number;
+  version?: string;
   width: number;
   height: number;
   output: string | null;

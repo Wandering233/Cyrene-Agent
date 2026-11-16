@@ -4,6 +4,7 @@ import { IPC } from "../../shared/ipc-channels";
 import { PetOverlayHostClient } from "./host-client";
 import { resolvePointerClickCount, type PointerClickState } from "./click-count";
 import {
+  OVERLAY_HOST_VERSION,
   PROTOCOL_VERSION,
   frameStride,
   pointerButtonName,
@@ -408,6 +409,12 @@ export class PetOverlayController {
         break;
       }
       case "ready":
+        if (event.version && event.version !== OVERLAY_HOST_VERSION) {
+          this.fail(new Error(
+            `HOST_VERSION_MISMATCH: host ${event.version}, expected ${OVERLAY_HOST_VERSION}`,
+          ));
+          return;
+        }
         if (event.protocol !== PROTOCOL_VERSION) {
           this.fail(new Error(
             `PROTOCOL_MISMATCH: host ${event.protocol}, Electron ${PROTOCOL_VERSION}`,

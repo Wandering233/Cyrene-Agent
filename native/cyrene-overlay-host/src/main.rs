@@ -817,6 +817,7 @@ impl Overlay {
             .and_then(|output| self.output_state.info(output).and_then(|info| info.name));
         self.writer.send(&HostEvent::Ready {
             protocol: PROTOCOL_VERSION,
+            version: env!("CARGO_PKG_VERSION").to_string(),
             width: self.width,
             height: self.height,
             output,

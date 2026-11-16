@@ -68,6 +68,7 @@ pub enum HostEvent {
     },
     Ready {
         protocol: u32,
+        version: String,
         width: u32,
         height: u32,
         output: Option<String>,
