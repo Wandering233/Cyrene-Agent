@@ -3,7 +3,7 @@
 > 基线：`e42a45b4 feat(跨平台): 增加 Linux Wayland 原生桌宠 overlay`
 > 环境：Arch Linux + Hyprland 0.57.1 + Wayland，Electron 44.7.2
 > 说明：本文是**全量任务清单与逐项核对结果**；已完成项会随实现更新。
-> 最近更新：QA-03 60s 验收；soak CPU/fd 采样；Wayland touch 转发；4K 输出性能采样；60s soak/隐藏渲染验收；Toast 键盘可达性；OVL-16 延迟指标；QA-01 宿主集成测试验收；协议校验脚本；UPD-01 本地 feed 验收；OVL-12 协议不匹配 e2e；SHOT-02 窗口截图验收；窗口截图目标；GS-01/GS-04 验收；SHOT-05 多屏截图验收；slurp 选区修复；打包校验和校验；DE 矩阵文档验收；协议 fuzz/reduced motion；宿主校验和；WIN-03 Hyprland 光标回退验收；主题指针；clickCount 单测；QA-04 失败路径；仅 Hyprland 范围；OVL-09 bottom layer；OVL-13；验收状态汇总；overlay soak；overlay 帧统计；Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
+> 最近更新：Toast 高对比度；QA-03 60s 验收；soak CPU/fd 采样；Wayland touch 转发；4K 输出性能采样；60s soak/隐藏渲染验收；Toast 键盘可达性；OVL-16 延迟指标；QA-01 宿主集成测试验收；协议校验脚本；UPD-01 本地 feed 验收；OVL-12 协议不匹配 e2e；SHOT-02 窗口截图验收；窗口截图目标；GS-01/GS-04 验收；SHOT-05 多屏截图验收；slurp 选区修复；打包校验和校验；DE 矩阵文档验收；协议 fuzz/reduced motion；宿主校验和；WIN-03 Hyprland 光标回退验收；主题指针；clickCount 单测；QA-04 失败路径；仅 Hyprland 范围；OVL-09 bottom layer；OVL-13；验收状态汇总；overlay soak；overlay 帧统计；Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
 
 
 ## 验证范围（按用户指定）
@@ -144,7 +144,7 @@
 | QA-05 | 🟡 | 协议 fuzz/边界 | 确定性随机 JSON 2000 例解析不 panic；stride/尺寸边界；半包/乱序仍待 | 半包/乱序/host 端 fuzz | P2 |
 | QA-06 | 🟡 | 打包产物测试 | AppImage 实机 + autostart；`verify:linux-artifacts` 校验 AppImage/latest-linux.yml/两个宿主/打包 SHA256SUMS | 多架构、真实升级 | P1 |
 | QA-07 | 🟡 | Linux CI | 新增 `.github/workflows/linux.yml`：Node checks/test + Rust test/build 两 job；尚未实际跑 CI | 远程 CI 首跑、E2E 矩阵 | P0 |
-| QA-08 | 🟡 | 无障碍/减少动画 | Toast 支持 reduced-motion、Tab/Enter/Space 触发、focus-visible 轮廓；对比度/桌宠动画未做 | 对比度、桌宠动画 | P2 |
+| QA-08 | ✅ | 无障碍/减少动画 | Toast：reduced-motion、键盘触发、focus-visible、prefers-contrast 高对比边框；桌宠动画未降级 | 已验收（Toast） | P2 |
 
 ---
 
