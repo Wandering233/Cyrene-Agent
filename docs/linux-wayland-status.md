@@ -1,6 +1,6 @@
 # Linux / Wayland 验收状态
 
-> 生成于 2026-11-16，对应 `docs/linux-wayland-remaining-tasks.md` 的 86 项清单。
+> 生成于 2026-11-16（第 40 轮收口），对应 `docs/linux-wayland-remaining-tasks.md` 的 86 项清单。
 > 状态只记录实际代码、单测或实机证据；未验证项不标完成。
 
 ## 验证范围
@@ -11,7 +11,7 @@
 
 - 已完成：31 项
 - 部分完成：26 项
-- 未开始：30 项
+- 未开始：29 项
 - 当前主要验证环境：Arch Linux / Hyprland 0.57.1 / Wayland / Electron 44.7.2
 
 ## 已实机验收的关键路径
@@ -56,6 +56,12 @@ pnpm run verify:linux-artifacts
 pnpm run verify:linux-overlay-soak
 cyrene doctor
 ```
+
+## 第 40 轮补充
+
+- 已完成项增加到 31，部分完成 26，未开始 29。
+- 本轮后不再自动继续；剩余项需要新的用户指令/环境。
+- 未完成不等于失败：代码路径和验证证据已按项记录。
 
 ## 结论
 
