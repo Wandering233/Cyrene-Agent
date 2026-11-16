@@ -3,7 +3,7 @@
 > 基线：`e42a45b4 feat(跨平台): 增加 Linux Wayland 原生桌宠 overlay`
 > 环境：Arch Linux + Hyprland 0.57.1 + Wayland，Electron 44.7.2
 > 说明：本文是**全量任务清单与逐项核对结果**；已完成项会随实现更新。
-> 最近更新：窗口截图目标；GS-01/GS-04 验收；SHOT-05 多屏截图验收；slurp 选区修复；打包校验和校验；DE 矩阵文档验收；协议 fuzz/reduced motion；宿主校验和；WIN-03 Hyprland 光标回退验收；主题指针；clickCount 单测；QA-04 失败路径；仅 Hyprland 范围；OVL-09 bottom layer；OVL-13；验收状态汇总；overlay soak；overlay 帧统计；Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
+> 最近更新：SHOT-02 窗口截图验收；窗口截图目标；GS-01/GS-04 验收；SHOT-05 多屏截图验收；slurp 选区修复；打包校验和校验；DE 矩阵文档验收；协议 fuzz/reduced motion；宿主校验和；WIN-03 Hyprland 光标回退验收；主题指针；clickCount 单测；QA-04 失败路径；仅 Hyprland 范围；OVL-09 bottom layer；OVL-13；验收状态汇总；overlay soak；overlay 帧统计；Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
 
 
 ## 验证范围（按用户指定）
@@ -73,7 +73,7 @@
 | ID | 状态 | 任务 | 核对证据/现状 | 剩余工作与验收 | 优先级 |
 |---|---|---|---|---|---|
 | SHOT-01 | 🟡 | portal Screenshot v2 | 仅 Hyprland：Electron 内 portal 可运行、非交互返回 2，grim 回退；未跨 DE | 仅 Hyprland；其他 DE 未验 | P0 |
-| SHOT-02 | 🟡 | 全屏/区域/窗口截图 | Hyprland：grim 全屏/区域实测；新增 `screenshot-window`（hyprctl activewindow → grim -g）与单测；运行时 activewindow 为空未完成实机 | 窗口截图实机 | P0 |
+| SHOT-02 | ✅ | 全屏/区域/窗口截图 | Hyprland：grim 全屏/区域实测；`screenshot-window` 在 activewindow 为空时回退 cursor+clients，实机捕获 1019×1374 窗口 PNG | 已验收 | P0 |
 | SHOT-03 | ✅ | 标注 overlay | 新增 Electron 标注窗口（画笔/矩形/箭头/撤销/清空/保存/取消）；自动化保存实测生成同尺寸 annotated PNG | 文字/马赛克可后续 | P0 |
 | SHOT-04 | ✅ | 剪贴板/文件保存 | 截图/标注写入 userData/screenshots；热键 ClipboardItem 写剪贴板（Electron 实测读回 image/png）；标注保存实测 | 已验收 | P0 |
 | SHOT-05 | ✅ | 多屏/HiDPI 截图 | 多输出 grim 全屏 6396×2984；HEADLESS 2x 输出截图正常；区域选择修复后真实产出 PNG | 已验收（未暴露单输出选择） | P0 |

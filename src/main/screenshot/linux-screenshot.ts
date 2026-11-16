@@ -54,13 +54,31 @@ export async function captureLinuxScreenshot(
         const parsed = JSON.parse(active.stdout) as {
           at?: [number, number]; size?: [number, number]; title?: string;
         };
-        if (!Array.isArray(parsed.at) || !Array.isArray(parsed.size)) {
-          throw new Error("active window has no geometry");
+        if (parsed && Array.isArray(parsed.at) && Array.isArray(parsed.size)
+          && parsed.size[0] > 0 && parsed.size[1] > 0) {
+          geometry = `${parsed.at[0]},${parsed.at[1]} ${parsed.size[0]}x${parsed.size[1]}`;
+        } else {
+          // Layer-shell overlays can make activewindow null. Fall back to the
+          // topmost ordinary client under the cursor.
+          const [cursor, clients] = await Promise.all([
+            run("hyprctl", ["-j", "cursorpos"]),
+            run("hyprctl", ["-j", "clients"]),
+          ]);
+          const point = JSON.parse(cursor.stdout) as { x?: number; y?: number };
+          const list = JSON.parse(clients.stdout) as Array<{
+            at?: [number, number]; size?: [number, number]; hidden?: boolean;
+          }>;
+          const hit = list.filter((client) => {
+            if (client.hidden) return false;
+            if (!Array.isArray(client.at) || !Array.isArray(client.size)) return false;
+            const [x, y] = client.at;
+            const [w, h] = client.size;
+            return typeof point.x === "number" && typeof point.y === "number"
+              && point.x >= x && point.x < x + w && point.y >= y && point.y < y + h;
+          }).sort((a, b) => (a.size![0] * a.size![1]) - (b.size![0] * b.size![1]))[0];
+          if (!hit) throw new Error("no window under cursor");
+          geometry = `${hit.at![0]},${hit.at![1]} ${hit.size![0]}x${hit.size![1]}`;
         }
-        const [x, y] = parsed.at;
-        const [width, height] = parsed.size;
-        if (width <= 0 || height <= 0) throw new Error("active window has empty size");
-        geometry = `${x},${y} ${width}x${height}`;
       } catch (error) {
         throw new LinuxScreenshotError(
           "SCREENSHOT_FAILED",

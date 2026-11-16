@@ -134,3 +134,28 @@ describe("window capture", () => {
     expect(fs.existsSync(filePath)).toBe(true);
   });
 });
+
+describe("window capture fallback", () => {
+  it("uses cursor clients when activewindow is null", async () => {
+    const outputDirectory = makeTempDir();
+    const run = vi.fn(async (command: string, args: string[]) => {
+      if (command === "grim" && (args[0] === "--version" || args[0] === "-h")) return { stdout: "", stderr: "" };
+      if (command === "hyprctl" && args[1] === "activewindow") return { stdout: "null", stderr: "" };
+      if (command === "hyprctl" && args[1] === "cursorpos") return { stdout: JSON.stringify({ x: 300, y: 200 }), stderr: "" };
+      if (command === "hyprctl" && args[1] === "clients") return {
+        stdout: JSON.stringify([
+          { at: [100, 100], size: [400, 300], hidden: false },
+          { at: [0, 0], size: [1920, 1080], hidden: false },
+        ]), stderr: "",
+      };
+      if (command === "grim") { fs.writeFileSync(args[2], "png"); return { stdout: "", stderr: "" }; }
+      throw new Error(`unexpected ${command} ${args.join(" ")}`);
+    });
+    const filePath = await captureLinuxScreenshot({
+      interactive: false, target: "window", outputDirectory,
+      env: { HYPRLAND_INSTANCE_SIGNATURE: "test" }, run,
+    });
+    expect(run).toHaveBeenCalledWith("grim", ["-g", "100,100 400x300", filePath]);
+    expect(fs.existsSync(filePath)).toBe(true);
+  });
+});
