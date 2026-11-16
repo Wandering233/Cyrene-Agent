@@ -3,7 +3,7 @@
 > 基线：`e42a45b4 feat(跨平台): 增加 Linux Wayland 原生桌宠 overlay`
 > 环境：Arch Linux + Hyprland 0.57.1 + Wayland，Electron 44.7.2
 > 说明：本文是**全量任务清单与逐项核对结果**；已完成项会随实现更新。
-> 最近更新：截图快捷键设置 UI；桌宠右键菜单；宿主版本绑定；fullscreen fallback 验收；input region 自适应/基准；AppImage 产物验收；Doctor AppArmor 检测；截图隐私/清理验收；更新校验和验收；Linux release 工作流；1.25 分数缩放验收；CI/校验和验收；标注取消清理；GS-03 按键触发验收；4K120/600x750 验收；Toast 高对比度；QA-03 60s 验收；soak CPU/fd 采样；Wayland touch 转发；4K 输出性能采样；60s soak/隐藏渲染验收；Toast 键盘可达性；OVL-16 延迟指标；QA-01 宿主集成测试验收；协议校验脚本；UPD-01 本地 feed 验收；OVL-12 协议不匹配 e2e；SHOT-02 窗口截图验收；窗口截图目标；GS-01/GS-04 验收；SHOT-05 多屏截图验收；slurp 选区修复；打包校验和校验；DE 矩阵文档验收；协议 fuzz/reduced motion；宿主校验和；WIN-03 Hyprland 光标回退验收；主题指针；clickCount 单测；QA-04 失败路径；仅 Hyprland 范围；OVL-09 bottom layer；OVL-13；验收状态汇总；overlay soak；overlay 帧统计；Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
+> 最近更新：跨 DE/X11 项标记不适用；截图快捷键设置 UI；桌宠右键菜单；宿主版本绑定；fullscreen fallback 验收；input region 自适应/基准；AppImage 产物验收；Doctor AppArmor 检测；截图隐私/清理验收；更新校验和验收；Linux release 工作流；1.25 分数缩放验收；CI/校验和验收；标注取消清理；GS-03 按键触发验收；4K120/600x750 验收；Toast 高对比度；QA-03 60s 验收；soak CPU/fd 采样；Wayland touch 转发；4K 输出性能采样；60s soak/隐藏渲染验收；Toast 键盘可达性；OVL-16 延迟指标；QA-01 宿主集成测试验收；协议校验脚本；UPD-01 本地 feed 验收；OVL-12 协议不匹配 e2e；SHOT-02 窗口截图验收；窗口截图目标；GS-01/GS-04 验收；SHOT-05 多屏截图验收；slurp 选区修复；打包校验和校验；DE 矩阵文档验收；协议 fuzz/reduced motion；宿主校验和；WIN-03 Hyprland 光标回退验收；主题指针；clickCount 单测；QA-04 失败路径；仅 Hyprland 范围；OVL-09 bottom layer；OVL-13；验收状态汇总；overlay soak；overlay 帧统计；Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
 
 
 ## 验证范围（按用户指定）
@@ -17,6 +17,7 @@
 - ✅ 已完成并有验证证据
 - 🟡 部分完成/已有基础，但不满足验收
 - ❌ 未开始
+- ➖ 不适用：按当前用户范围排除（跨 DE/X11）
 
 ## 已完成基线
 
@@ -40,7 +41,7 @@
 |---|---|---|---|---|---|
 | OVL-01 | ✅ | GNOME 全屏透明 `xdg_toplevel` fallback | `cyrene-overlay-fullscreen` 在 Hyprland 强制 fullscreen 实测：client fullscreen=2、2238x1492、宠物 900,400；GNOME 未验 | 已验收（仅 Hyprland） | P0 |
 | OVL-02 | 🟡 | GNOME 全屏父 surface + 子 surface/局部 buffer | 仅 Hyprland 全屏 ARGB buffer（宠物区域拷贝/damage），未用 subsurface；未跨 DE | 4K 带宽优化；subsurface/局部 buffer | P0 |
-| OVL-03 | ❌ | GNOME 全屏态副作用 | 未处理；仅 Hyprland fullscreen 路径，未跨 DE | 顶栏、概览、全屏提示、idle inhibit；仅 Hyprland | P0 |
+| OVL-03 | ➖ | GNOME 全屏态副作用 | 仅 GNOME 相关；按范围不做跨 DE | 不适用 | P0 |
 | OVL-04 | ✅ | HiDPI buffer scale | 真实 HEADLESS output scale=2 实机：layer 400x500、buffer 800x1000；强制 2x 穿透/点击也验证 | 已验收 | P0 |
 | OVL-05 | ✅ | 分数缩放 1.25/1.5 | 真实 HEADLESS scale=1.25：layer 400×500、buffer 800×1000（ceil→2x 超采样），逻辑坐标正确 | 已验收（整数超采样） | P0 |
 | OVL-06 | ✅ | 按 `init.output` 选择输出 | 实机在 HEADLESS-1/2（x=2238, scale=2）创建 layer，位于 [2500,100]；输出名匹配/重建有效 | 多屏互切归 OVL-07/27 | P0 |
@@ -64,7 +65,7 @@
 | OVL-24 | ❌ | arm64/多架构 | 只构建当前 x64 | arm64 交叉构建/打包 | P1 |
 | OVL-25 | ✅ | CI 构建宿主/校验和 | 构建脚本生成 `SHA256SUMS`；CI native job `cargo build` + `sha256sum -c`；本地命令通过 | 已验收（未远程跑 CI） | P1 |
 | OVL-26 | ❌ | AppImage glibc/依赖兼容 | 本机 Arch 构建 | 旧发行版验证；libwayland 依赖声明 | P1 |
-| OVL-27 | ❌ | KDE/Sway/GNOME/多屏 E2E | 按用户要求不做跨 DE；仅 Hyprland 已验证 | 跨 DE 不验；仅 Hyprland | P0 |
+| OVL-27 | ➖ | KDE/Sway/GNOME/多屏 E2E | 按用户要求不做跨 DE | 不适用 | P0 |
 
 ---
 
@@ -90,7 +91,7 @@
 | GS-05 | 🟡 | 快捷键设置 UI/持久化 | 外观设置新增截图快捷键输入，保存到 general settings，生命周期自动重新注册；无录制/冲突检测 | 录制/冲突检测 | P1 |
 | TRAY-01 | ✅ | StatusNotifier 宿主检测 | 新增 `tray/tray-host.ts`，启动用 gdbus `NameHasOwner` 探测；单测覆盖；本机 quickshell 返回 true | 无宿主实机验证降级日志 | P0 |
 | TRAY-02 | ✅ | 无托盘降级入口 | 新增 `cyrene control` CLI + `$XDG_RUNTIME_DIR/cyrene-control.sock`（0600）；实测 `control show-chat` 打开聊天窗 | 已验收 | P0 |
-| TRAY-03 | ❌ | GNOME AppIndicator 提示 | 未做；按用户要求不跨 DE | 仅 Hyprland；跨 DE 不做 | P1 |
+| TRAY-03 | ➖ | GNOME AppIndicator 提示 | GNOME 专属；按范围不做 | 不适用 | P1 |
 | FOCUS-01 | ❌ | `xdg-activation` 支持 | 只有应用内 activation broker | 获取/使用 activation token | P0 |
 | FOCUS-02 | ❌ | 后台主动弹窗焦点 | 依赖 `show()/focus()` | 通知/激活 token；不抢焦点策略 | P0 |
 | FOCUS-03 | ✅ | 第二实例激活 | 实机第二实例退出后，第一实例打开聊天窗（`昔涟 · 聊天（React）`） | 已验收 | P1 |
@@ -126,7 +127,7 @@
 | WIN-04 | ❌ | 透明/焦点/激活 | 未系统验证；仅 Hyprland 范围 | 仅 Hyprland | P1 |
 | WIN-05 | ❌ | 剪贴板/文件选择/拖放/密钥环 | 未做 Wayland 回归；仅 Hyprland 范围 | 仅 Hyprland | P1 |
 | WIN-06 | ❌ | 屏幕录制/desktopCapturer | 未验证；仅 Hyprland 范围 | 仅 Hyprland | P2 |
-| WIN-07 | ❌ | X11 回归 | 未跑 X11；按用户要求仅 Hyprland | 仅 Hyprland | P1 |
+| WIN-07 | ➖ | X11 回归 | 无 X11 路径；按范围不做 | 不适用 | P1 |
 | DOC-01 | ✅ | 安装/排障/升级文档 | 新增 `docs/linux-troubleshooting.md`：依赖、构建、doctor、控制通道、已知问题 | 已验收 | P1 |
 | DOC-02 | ✅ | DE 支持矩阵 | 文档矩阵明确 Hyprland 实测、其他 DE 标“未跨 DE 验证”；范围与状态一致 | 已验收（文档） | P1 |
 | DOC-03 | ✅ | 诊断命令 | `cyrene doctor` 输出会话/桌面/依赖/宿主/截图目录；单测覆盖；实机输出正常 | 日志导出可后续 | P2 |
@@ -138,7 +139,7 @@
 | ID | 状态 | 任务 | 核对证据/现状 | 剩余工作与验收 | 优先级 |
 |---|---|---|---|---|---|
 | QA-01 | ✅ | 宿主集成测试 | 假宿主 ready/init/pointer/失败路径 + 真实宿主协议不匹配 e2e + alpha input region 单测；未做假 compositor | 已验收（无假 compositor） | P0 |
-| QA-02 | ❌ | 合成器 E2E 矩阵 | 按用户要求不做跨 DE；仅 Hyprland 测试 | 仅 Hyprland；跨 DE 不做 | P0 |
+| QA-02 | ➖ | 合成器 E2E 矩阵 | 按用户要求不做跨 DE | 不适用 | P0 |
 | QA-03 | ✅ | 性能/内存/句柄泄漏 | 60s soak：RSS -7.0%、CPU 6.7%、延迟 1ms；fd 复核 157→156（差值来自字典/GPU 缓存，非泄漏）；更长跑未测 | 已验收（60s） | P1 |
 | QA-04 | ✅ | 失败路径 | fake host 覆盖：协议错、启动超时、二进制 spawn 失败、ready 前退出；0600/停止/清理 | 已验收（Hyprland fake host） | P1 |
 | QA-05 | 🟡 | 协议 fuzz/边界 | 确定性随机 JSON 2000 例解析不 panic；stride/尺寸边界；半包/乱序仍待 | 半包/乱序/host 端 fuzz | P2 |
