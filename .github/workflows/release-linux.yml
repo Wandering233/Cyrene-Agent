@@ -1,0 +1,36 @@
+name: Release Linux
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  linux-release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run package:linux
+      - run: node scripts/verify/linux-artifacts.mjs release
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/Cyrene-*.AppImage
+            release/cyrene-agent-*.tar.gz
+            release/latest-linux.yml
+            release/*.blockmap
+          fail_on_unmatched_files: false
+          generate_release_notes: true

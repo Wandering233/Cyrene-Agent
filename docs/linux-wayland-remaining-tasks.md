@@ -3,7 +3,7 @@
 > 基线：`e42a45b4 feat(跨平台): 增加 Linux Wayland 原生桌宠 overlay`
 > 环境：Arch Linux + Hyprland 0.57.1 + Wayland，Electron 44.7.2
 > 说明：本文是**全量任务清单与逐项核对结果**；已完成项会随实现更新。
-> 最近更新：1.25 分数缩放验收；CI/校验和验收；标注取消清理；GS-03 按键触发验收；4K120/600x750 验收；Toast 高对比度；QA-03 60s 验收；soak CPU/fd 采样；Wayland touch 转发；4K 输出性能采样；60s soak/隐藏渲染验收；Toast 键盘可达性；OVL-16 延迟指标；QA-01 宿主集成测试验收；协议校验脚本；UPD-01 本地 feed 验收；OVL-12 协议不匹配 e2e；SHOT-02 窗口截图验收；窗口截图目标；GS-01/GS-04 验收；SHOT-05 多屏截图验收；slurp 选区修复；打包校验和校验；DE 矩阵文档验收；协议 fuzz/reduced motion；宿主校验和；WIN-03 Hyprland 光标回退验收；主题指针；clickCount 单测；QA-04 失败路径；仅 Hyprland 范围；OVL-09 bottom layer；OVL-13；验收状态汇总；overlay soak；overlay 帧统计；Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
+> 最近更新：Linux release 工作流；1.25 分数缩放验收；CI/校验和验收；标注取消清理；GS-03 按键触发验收；4K120/600x750 验收；Toast 高对比度；QA-03 60s 验收；soak CPU/fd 采样；Wayland touch 转发；4K 输出性能采样；60s soak/隐藏渲染验收；Toast 键盘可达性；OVL-16 延迟指标；QA-01 宿主集成测试验收；协议校验脚本；UPD-01 本地 feed 验收；OVL-12 协议不匹配 e2e；SHOT-02 窗口截图验收；窗口截图目标；GS-01/GS-04 验收；SHOT-05 多屏截图验收；slurp 选区修复；打包校验和校验；DE 矩阵文档验收；协议 fuzz/reduced motion；宿主校验和；WIN-03 Hyprland 光标回退验收；主题指针；clickCount 单测；QA-04 失败路径；仅 Hyprland 范围；OVL-09 bottom layer；OVL-13；验收状态汇总；overlay soak；overlay 帧统计；Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
 
 
 ## 验证范围（按用户指定）
@@ -107,7 +107,7 @@
 | AUTO-03 | ✅ | `--autostart` 静默启动 | 打包版 `--autostart` 实测只显示桌宠/overlay，不显示聊天窗 | 已验收 | P0 |
 | AUTO-04 | ✅ | 设置与文件同步/测试 | `launch-at-login.test.ts` 覆盖写入/移除/AppImage 转义/dev 跳过 | 路径失效实机验证 | P1 |
 | UPD-01 | ✅ | AppImage 更新 feed | `latest-linux.yml` 生成（version/sha512/AppImage path）；`verify:linux-artifacts` 校验通过；上传/升级归 UPD-02/QA-06 | 已验收（本地 feed） | P0 |
-| UPD-02 | ❌ | Linux release 资产 | electron-builder 有 Linux target，无发布流程 | GitHub Release 上传 AppImage/tar.gz/yml | P0 |
+| UPD-02 | ✅ | Linux release 资产 | 新增 `.github/workflows/release-linux.yml`：tag 触发打包、校验、上传 AppImage/tar.gz/latest-linux.yml/blockmap；尚未实际发版 | 已验收（工作流） | P0 |
 | UPD-03 | ✅ | `APPIMAGE` 检测/手动更新 | 打包 Linux 无 `APPIMAGE` 时更新状态为 `error: unsupported`，UI 已加中/英/日文案；AppImage 才启用 | 已验收 | P0 |
 | UPD-04 | ❌ | 更新签名/校验 | 无 Linux 签名 | minisign/GPG 或 sha512 + 文档 | P1 |
 | UPD-05 | ❌ | Electron/宿主原子更新 | 宿主随包更新，无版本校验 | 协议版本/宿主版本绑定 | P1 |
