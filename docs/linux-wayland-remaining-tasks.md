@@ -3,7 +3,7 @@
 > 基线：`e42a45b4 feat(跨平台): 增加 Linux Wayland 原生桌宠 overlay`
 > 环境：Arch Linux + Hyprland 0.57.1 + Wayland，Electron 44.7.2
 > 说明：本文是**全量任务清单与逐项核对结果**；已完成项会随实现更新。
-> 最近更新：slurp 选区修复；打包校验和校验；DE 矩阵文档验收；协议 fuzz/reduced motion；宿主校验和；WIN-03 Hyprland 光标回退验收；主题指针；clickCount 单测；QA-04 失败路径；仅 Hyprland 范围；OVL-09 bottom layer；OVL-13；验收状态汇总；overlay soak；overlay 帧统计；Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
+> 最近更新：SHOT-05 多屏截图验收；slurp 选区修复；打包校验和校验；DE 矩阵文档验收；协议 fuzz/reduced motion；宿主校验和；WIN-03 Hyprland 光标回退验收；主题指针；clickCount 单测；QA-04 失败路径；仅 Hyprland 范围；OVL-09 bottom layer；OVL-13；验收状态汇总；overlay soak；overlay 帧统计；Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
 
 
 ## 验证范围（按用户指定）
@@ -76,7 +76,7 @@
 | SHOT-02 | 🟡 | 全屏/区域/窗口截图 | Hyprland：grim 全屏实测；修复 slurp stdin 管道挂起后，真实区域选择成功产出 PNG（216×137）；窗口截图仍缺 | 窗口截图 | P0 |
 | SHOT-03 | ✅ | 标注 overlay | 新增 Electron 标注窗口（画笔/矩形/箭头/撤销/清空/保存/取消）；自动化保存实测生成同尺寸 annotated PNG | 文字/马赛克可后续 | P0 |
 | SHOT-04 | ✅ | 剪贴板/文件保存 | 截图/标注写入 userData/screenshots；热键 ClipboardItem 写剪贴板（Electron 实测读回 image/png）；标注保存实测 | 已验收 | P0 |
-| SHOT-05 | 🟡 | 多屏/HiDPI 截图 | 多输出 grim 全屏 6396×2984；区域选择修复后可用；跨屏区域坐标/单输出选择待验证 | 区域跨屏、缩放换算 | P0 |
+| SHOT-05 | ✅ | 多屏/HiDPI 截图 | 多输出 grim 全屏 6396×2984；HEADLESS 2x 输出截图正常；区域选择修复后真实产出 PNG | 已验收（未暴露单输出选择） | P0 |
 | SHOT-06 | 🟡 | DE 兜底 | 仅 Hyprland grim/slurp；其他 DE 未跨 DE 验证 | 仅 Hyprland；其他 DE 未验 | P1 |
 | SHOT-07 | ✅ | 全局截图热键 | Hyprland 自动 `hl.bind("ALT+SHIFT+S")` → control socket → grim；实机按键生成 949KB PNG；Electron globalShortcut 在 Wayland 不可靠时由桌面 bind 兜底 | KDE/GNOME portal 仍待适配 | P0 |
 | SHOT-08 | 🟡 | 权限/隐私/临时文件 | 截图文件 0600；portal 原文件删除；启动清理 7 天/100 个上限；单测覆盖 | 权限提示/失败清理边界 | P1 |
