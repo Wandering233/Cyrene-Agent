@@ -42,7 +42,7 @@
 | OVL-09 | 🟡 | `petAlwaysOnTop=false` 语义 | 已能切 `TOP`/`OVERLAY`，但关闭仍是 `TOP` | 普通层级模式或明确文档化限制 | P1 |
 | OVL-10 | 🟡 | 全屏/锁屏/通知 z-order | 只验证普通窗口 | 全屏游戏、锁屏、通知中心、面板遮挡 | P1 |
 | OVL-11 | ✅ | 宿主崩溃自动重启/watchdog | 3 次退避重启（500/1500/3000ms）；实测 kill -9 后新宿主启动、layer/位置恢复；不可恢复错误直接回退 | 长时间 watchdog 仍可加强 | P1 |
-| OVL-12 | 🟡 | 协议版本握手/能力协商 | init/ready 带 `protocol:1`；宿主不匹配发 `PROTOCOL_MISMATCH` 并退出 | 端到端不匹配实测 | P1 |
+| OVL-12 | 🟡 | 协议版本握手/能力协商 | 宿主错误事件 `PROTOCOL_MISMATCH` 客户端测试通过；init 携带 protocol | 真实宿主不匹配端到端 | P1 |
 | OVL-13 | 🟡 | socket/多实例/stale 清理 | 新增 fake host 集成测试：0600、ready/init/pointer、stop 删除 socket | 并发启动、异常退出/残留 | P1 |
 | OVL-14 | ❌ | shared texture/DMA-BUF 零拷贝 | 当前 CPU bitmap + socket 拷贝 | 评估 `offscreen.useSharedTexture`，降 CPU/延迟 | P2 |
 | OVL-15 | ❌ | 4K/120Hz/大尺寸性能 | 只测 400×500 约 59fps | 4K/600×750/120Hz 基准与优化 | P1 |
@@ -133,7 +133,7 @@
 | QA-01 | 🟡 | 宿主集成测试 | 新增 `host-client.test.ts` 假宿主：ready/init/pointer/cleanup；Rust 单测保留 | 假 compositor、输入区域断言 | P0 |
 | QA-02 | ❌ | 合成器 E2E 矩阵 | 只测 Hyprland | KDE/Sway/GNOME/多屏/4K | P0 |
 | QA-03 | ❌ | 性能/内存/句柄泄漏 | 只测 59fps | 长跑、CPU、RSS、fd、延迟 | P1 |
-| QA-04 | 🟡 | 失败路径 | host client 集成测试覆盖启动/停止/socket 权限；崩溃/超时/协议错仍待补 | 超时/崩溃/协议错/socket 拒绝 | P1 |
+| QA-04 | 🟡 | 失败路径 | 新增宿主协议错、启动超时测试；启动/停止/0600 已覆盖 | socket 拒绝/崩溃恢复端到端 | P1 |
 | QA-05 | 🟡 | 协议 fuzz/边界 | Rust 边界测试覆盖 stride 溢出/零 stride；Jet 边界畸形帧仍待补 | 畸形帧/半包/乱序 fuzz | P2 |
 | QA-06 | 🟡 | 打包产物测试 | AppImage 实机 + autostart 验证；`verify:linux-artifacts` 检查 AppImage/latest-linux.yml/两个宿主 | 多架构、真实升级 | P1 |
 | QA-07 | 🟡 | Linux CI | 新增 `.github/workflows/linux.yml`：Node checks/test + Rust test/build 两 job；尚未实际跑 CI | 远程 CI 首跑、E2E 矩阵 | P0 |

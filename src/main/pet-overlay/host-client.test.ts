@@ -65,3 +65,45 @@ describe("PetOverlayHostClient", () => {
     expect(fs.existsSync(client.socketFilePath)).toBe(false);
   });
 });
+
+describe("PetOverlayHostClient failure paths", () => {
+  it("reports a host error event and rejects startup", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cyrene-host-error-test-"));
+    tempDirs.push(dir);
+    const script = path.join(dir, "error-host.mjs");
+    fs.writeFileSync(script, `#!/usr/bin/env node
+import net from "node:net";
+const i = process.argv.indexOf("--socket");
+const socket = net.createConnection(process.argv[i + 1]);
+socket.write(JSON.stringify({ type: "error", code: "PROTOCOL_MISMATCH", message: "client 2 host 1" }) + "\\n");
+setTimeout(() => process.exit(0), 2000);
+`, { mode: 0o755 });
+    const failures: Error[] = [];
+    const client = new PetOverlayHostClient(script, {
+      onEvent: () => {},
+      onFailure: (error) => failures.push(error),
+      onLog: () => {},
+    });
+
+    await expect(client.start(1000)).rejects.toThrow(/PROTOCOL_MISMATCH/);
+    expect(failures.length).toBeGreaterThan(0);
+    client.stop();
+  });
+
+  it("rejects when the host never becomes ready", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cyrene-host-timeout-test-"));
+    tempDirs.push(dir);
+    const script = path.join(dir, "slow-host.mjs");
+    fs.writeFileSync(script, `#!/usr/bin/env node
+import net from "node:net";
+const i = process.argv.indexOf("--socket");
+net.createConnection(process.argv[i + 1]);
+setTimeout(() => process.exit(0), 3000);
+`, { mode: 0o755 });
+    const client = new PetOverlayHostClient(script, {
+      onEvent: () => {}, onFailure: () => {}, onLog: () => {},
+    });
+    await expect(client.start(200)).rejects.toThrow(/did not become ready/);
+    client.stop();
+  });
+});
