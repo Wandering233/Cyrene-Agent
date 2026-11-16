@@ -52,6 +52,8 @@ const CLOSE_ICON =
 function buildCard(item: ToastItem): HTMLElement {
   const el = document.createElement("article");
   el.className = `toast-card toast-card--${item.tier}`;
+  el.tabIndex = 0;
+  el.setAttribute("role", "button");
   el.dataset.id = item.id;
 
   const icon = document.createElement("span");
@@ -88,6 +90,11 @@ function buildCard(item: ToastItem): HTMLElement {
 
   el.append(icon, body, close);
   el.addEventListener("click", () => {
+    api?.clicked(item.id);
+  });
+  el.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
     api?.clicked(item.id);
   });
   return el;

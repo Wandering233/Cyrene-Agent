@@ -171,3 +171,8 @@ body {
     animation-iteration-count: 1 !important;
   }
 }
+
+.toast-card:focus-visible {
+  outline: 2px solid #5a6cff;
+  outline-offset: 2px;
+}
