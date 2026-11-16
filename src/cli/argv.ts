@@ -12,7 +12,8 @@ export type Command =
   | { kind: "help" }
   | { kind: "run" }
   | { kind: "control"; command: string }
-  | { kind: "placeholder"; name: "doctor" | "init" | "update" }
+  | { kind: "doctor" }
+  | { kind: "placeholder"; name: "init" | "update" }
   | { kind: "unknown"; name: string };
 
 const SUBCOMMANDS = new Map<string, Command>([
@@ -21,7 +22,7 @@ const SUBCOMMANDS = new Map<string, Command>([
   ["version", { kind: "version" }],
   ["help", { kind: "help" }],
   ["run", { kind: "run" }],
-  ["doctor", { kind: "placeholder", name: "doctor" }],
+  ["doctor", { kind: "doctor" }],
   ["init", { kind: "placeholder", name: "init" }],
   ["update", { kind: "placeholder", name: "update" }],
 ]);

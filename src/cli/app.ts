@@ -12,6 +12,7 @@ import { parseArgv, type Command } from "./argv.js";
 import {
   cmdAbout,
   cmdDefault,
+  cmdDoctor,
   cmdHello,
   cmdHelp,
   cmdPlaceholder,
@@ -52,6 +53,8 @@ export async function main(argv: readonly string[], versionOverride?: string): P
       return cmdRun();
     case "control":
       return cmdControl(cmd.command);
+    case "doctor":
+      return cmdDoctor();
     case "placeholder":
       return cmdPlaceholder(cmd.name);
     case "unknown":

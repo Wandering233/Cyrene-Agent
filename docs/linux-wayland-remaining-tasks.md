@@ -3,7 +3,7 @@
 > 基线：`e42a45b4 feat(跨平台): 增加 Linux Wayland 原生桌宠 overlay`
 > 环境：Arch Linux + Hyprland 0.57.1 + Wayland，Electron 44.7.2
 > 说明：本文是**全量任务清单与逐项核对结果**；已完成项会随实现更新。
-> 最近更新：Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
+> 最近更新：doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
 
 ## 状态图例
 
@@ -120,9 +120,9 @@
 | WIN-05 | ❌ | 剪贴板/文件选择/拖放/密钥环 | 未做 Wayland 回归 | 逐项验证并修复 | P1 |
 | WIN-06 | ❌ | 屏幕录制/desktopCapturer | 未验证 | PipeWire/ScreenCast/restore token | P2 |
 | WIN-07 | ❌ | X11 回归 | overlay 改动后未跑 X11 实机 | X11 普通路径全量回归 | P1 |
-| DOC-01 | ❌ | 安装/排障/升级文档 | 只有 overlay 设计文档 | 用户向安装、依赖、已知问题 | P1 |
-| DOC-02 | ❌ | DE 支持矩阵 | 文档只有 Hyprland | KDE/Sway/GNOME/COSMIC 实测表 | P1 |
-| DOC-03 | ❌ | 诊断命令 | 无 | `cyrene doctor`/日志导出 | P2 |
+| DOC-01 | ✅ | 安装/排障/升级文档 | 新增 `docs/linux-troubleshooting.md`：依赖、构建、doctor、控制通道、已知问题 | 已验收 | P1 |
+| DOC-02 | 🟡 | DE 支持矩阵 | 文档新增 Hyprland/KDE/Sway/GNOME 矩阵，标注实测/预期/待 E2E | KDE/Sway/GNOME/COSMIC 实机 | P1 |
+| DOC-03 | ✅ | 诊断命令 | `cyrene doctor` 输出会话/桌面/依赖/宿主/截图目录；单测覆盖；实机输出正常 | 日志导出可后续 | P2 |
 
 ---
 

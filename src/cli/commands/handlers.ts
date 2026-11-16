@@ -10,6 +10,7 @@ import { renderAbout, renderBanner } from "../banner/render.js";
 import { ABOUT_LINES, BANNER_LINES } from "../banner/text.js";
 import { readState, writeState, type FirstLaunchRecord } from "../state/state.js";
 import { errLine, outLine } from "../util/log.js";
+import { runDoctor } from "../doctor.js";
 
 export interface HandlerCtx {
   version: string;
@@ -43,7 +44,7 @@ Commands:
   version   Print version only
   run       Launch the Electron desktop app [dev only]
   control   Send a local control command (show-chat/show-settings/toggle-pet/screenshot/toast-test/quit)
-  doctor    Diagnose the local environment (planned)
+  doctor    Diagnose the local Linux/Wayland environment
   init      Initialize a workspace (planned)
   update    Self-update (planned)
   help      Show this help
@@ -56,7 +57,15 @@ Run \`cyrene\` with no arguments for the first-time greeting.`);
   return 0;
 }
 
-export function cmdPlaceholder(name: "doctor" | "init" | "update"): number {
+export function cmdDoctor(): number {
+  const result = runDoctor();
+  for (const line of result.lines) outLine(line);
+  // Diagnostics are informational: missing optional tools must not turn a
+  // successful `cyrene doctor` invocation into a shell error.
+  return 0;
+}
+
+export function cmdPlaceholder(name: "init" | "update"): number {
   outLine(
     `cyrene ${name}: planned for a future release. See https://github.com/Playa-0v0/Cyrene-Agent`,
   );

@@ -119,10 +119,10 @@ describe("main: default (subsequent)", () => {
 });
 
 describe("main: placeholder", () => {
-  it("doctor prints the planned line", async () => {
+  it("doctor prints Linux/Wayland diagnostics", async () => {
     const code = await main(["doctor"], VERSION);
     expect(code).toBe(0);
-    expect(stdoutBuf).toContain("planned for a future release");
+    expect(stdoutBuf).toContain("Cyrene doctor");
   });
 });
 

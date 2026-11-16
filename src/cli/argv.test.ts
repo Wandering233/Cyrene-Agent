@@ -44,8 +44,8 @@ describe("parseArgv", () => {
     expect(parseArgv(["hello", "-v"])).toEqual({ kind: "version" });
   });
 
-  it("maps doctor/init/update to placeholder", () => {
-    expect(parseArgv(["doctor"])).toEqual({ kind: "placeholder", name: "doctor" });
+  it("maps doctor to diagnostics and init/update to placeholder", () => {
+    expect(parseArgv(["doctor"])).toEqual({ kind: "doctor" });
     expect(parseArgv(["init"])).toEqual({ kind: "placeholder", name: "init" });
     expect(parseArgv(["update"])).toEqual({ kind: "placeholder", name: "update" });
   });
