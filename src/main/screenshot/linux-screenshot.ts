@@ -18,8 +18,12 @@ export class LinuxScreenshotError extends Error {
   }
 }
 
+export type LinuxScreenshotTarget = "region" | "window" | "screen";
+
 export interface LinuxScreenshotOptions {
   interactive: boolean;
+  /** Explicit target; defaults to region when interactive, else screen. */
+  target?: LinuxScreenshotTarget;
   outputDirectory: string;
   /** Test seams. */
   env?: NodeJS.ProcessEnv;
@@ -38,11 +42,43 @@ export async function captureLinuxScreenshot(
 ): Promise<string> {
   const env = options.env ?? process.env;
   const run = options.run ?? defaultRun;
+  const target = options.target ?? (options.interactive ? "region" : "screen");
   await mkdir(options.outputDirectory, { recursive: true });
   const filePath = path.join(options.outputDirectory, `${randomUUID()}.png`);
 
   if (env.HYPRLAND_INSTANCE_SIGNATURE && await commandExists("grim", run)) {
-    if (options.interactive) {
+    if (target === "window") {
+      let geometry: string;
+      try {
+        const active = await run("hyprctl", ["-j", "activewindow"]);
+        const parsed = JSON.parse(active.stdout) as {
+          at?: [number, number]; size?: [number, number]; title?: string;
+        };
+        if (!Array.isArray(parsed.at) || !Array.isArray(parsed.size)) {
+          throw new Error("active window has no geometry");
+        }
+        const [x, y] = parsed.at;
+        const [width, height] = parsed.size;
+        if (width <= 0 || height <= 0) throw new Error("active window has empty size");
+        geometry = `${x},${y} ${width}x${height}`;
+      } catch (error) {
+        throw new LinuxScreenshotError(
+          "SCREENSHOT_FAILED",
+          `window capture failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+      try {
+        await run("grim", ["-g", geometry, filePath]);
+      } catch (error) {
+        throw new LinuxScreenshotError(
+          "SCREENSHOT_FAILED",
+          `grim window capture failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+      await chmod(filePath, 0o600);
+      return filePath;
+    }
+    if (target === "region") {
       if (!await commandExists("slurp", run)) {
         throw new LinuxScreenshotError(
           "SCREENSHOT_BACKEND_UNAVAILABLE",

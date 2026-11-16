@@ -113,3 +113,24 @@ describe("screenshot retention", () => {
     expect(fs.existsSync(keepPath)).toBe(true);
   });
 });
+
+describe("window capture", () => {
+  it("uses the active Hyprland window geometry", async () => {
+    const outputDirectory = makeTempDir();
+    const run = vi.fn(async (command: string, args: string[]) => {
+      if (command === "grim" && (args[0] === "--version" || args[0] === "-h")) return { stdout: "", stderr: "" };
+      if (command === "hyprctl") return { stdout: JSON.stringify({ at: [100, 200], size: [800, 600], title: "Zen" }), stderr: "" };
+      if (command === "grim") { fs.writeFileSync(args[2], "png"); return { stdout: "", stderr: "" }; }
+      throw new Error(`unexpected ${command}`);
+    });
+    const filePath = await captureLinuxScreenshot({
+      interactive: false,
+      target: "window",
+      outputDirectory,
+      env: { HYPRLAND_INSTANCE_SIGNATURE: "test" },
+      run,
+    });
+    expect(run).toHaveBeenCalledWith("grim", ["-g", "100,200 800x600", filePath]);
+    expect(fs.existsSync(filePath)).toBe(true);
+  });
+});

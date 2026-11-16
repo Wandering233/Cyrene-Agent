@@ -311,7 +311,7 @@ describe("Wayland capture backend", () => {
     });
 
     await expect(service.startFromChatButton()).resolves.toEqual({ ok: true });
-    expect(capture).toHaveBeenCalledWith(true);
+    expect(capture).toHaveBeenCalledWith(true, "region");
     expect(client.start).not.toHaveBeenCalled();
     expect(sendInsert).toHaveBeenCalledWith(expect.objectContaining({
       filePath: "/tmp/cyrene-test-screenshots/wayland.png",
@@ -391,5 +391,26 @@ describe("Linux annotation flow", () => {
       reason: "SCREENSHOT_CANCELLED",
     });
     expect(sendInsert).not.toHaveBeenCalled();
+  });
+});
+
+describe("window target", () => {
+  it("passes the window target to the capture backend", async () => {
+    const capture = vi.fn(async () => ({
+      filePath: "/tmp/cyrene-test-screenshots/window.png",
+      width: 800,
+      height: 600,
+    }));
+    const client = { start: vi.fn(), ensureStarted: vi.fn(), shutdown: vi.fn() } as unknown as ScreenshotHelperClient;
+    const service = createScreenshotService({
+      client,
+      sendInsert: vi.fn(),
+      capture,
+      registerShortcut: () => true,
+      unregisterShortcut: () => {},
+      isAvailable: () => true,
+    });
+    await expect(service.startFromChatButton(undefined, "window")).resolves.toEqual({ ok: true });
+    expect(capture).toHaveBeenCalledWith(true, "window");
   });
 });

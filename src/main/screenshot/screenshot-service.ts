@@ -12,7 +12,10 @@ export interface ScreenshotService {
   init(initialHotkey: string): void;
   prewarm(): Promise<void>;
   startFromHotkey(): Promise<{ ok: boolean; reason?: string }>;
-  startFromChatButton(sendInsert?: (data: ScreenshotInsertData) => void): Promise<{ ok: boolean; reason?: string }>;
+  startFromChatButton(
+    sendInsert?: (data: ScreenshotInsertData) => void,
+    target?: "region" | "window",
+  ): Promise<{ ok: boolean; reason?: string }>;
   replaceHotkey(next: string): { ok: boolean; activeHotkey: string | null };
   suspendHotkey(): void;
   resumeHotkey(): void;
@@ -23,7 +26,7 @@ export interface ScreenshotServiceDeps {
   client: ScreenshotHelperClient;
   sendInsert(data: ScreenshotInsertData): void;
   /** Wayland/Linux native capture backend; mutually exclusive with the Windows helper. */
-  capture?(interactive: boolean): Promise<{ filePath: string; width: number; height: number }>;
+  capture?(interactive: boolean, target?: "region" | "window"): Promise<{ filePath: string; width: number; height: number }>;
   copyToClipboard?(filePath: string): void;
   /** Optional annotation editor; return null when the user cancels. */
   annotate?(filePath: string): Promise<string | null>;
@@ -104,11 +107,12 @@ export function createScreenshotService(deps: ScreenshotServiceDeps): Screenshot
 
   const startFromChatButton = async (
     sendInsert: (data: ScreenshotInsertData) => void = deps.sendInsert,
+    target: "region" | "window" = "region",
   ): Promise<{ ok: boolean; reason?: string }> => {
     if (!isAvailable()) return { ok: false, reason: "SCREENSHOT_HELPER_UNAVAILABLE" };
     if (deps.capture) {
       try {
-        const result = await deps.capture(true);
+        const result = await deps.capture(true, target);
         let filePath = result.filePath;
         let hasAnnotations = false;
         if (deps.annotate) {

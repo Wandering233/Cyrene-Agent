@@ -6,6 +6,7 @@ export const CONTROL_COMMANDS = [
   "show-settings",
   "toggle-pet",
   "screenshot",
+  "screenshot-window",
   "toast-test",
   "quit",
   "ping",

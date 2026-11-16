@@ -11,7 +11,10 @@ import { captureLinuxScreenshot, pruneScreenshotDirectory } from "./linux-screen
 import { annotateScreenshot } from "../annotation/annotation-window";
 import { installHyprlandScreenshotHotkey } from "./hyprland-hotkey";
 import { GlobalShortcutsPortal, toPortalTrigger } from "../portal/global-shortcuts";
-import { setScreenshotControlHandler } from "../control/control-server";
+import {
+  setScreenshotControlHandler,
+  setScreenshotWindowControlHandler,
+} from "../control/control-server";
 import {
   createScreenshotService,
   validateScreenshotInsert,
@@ -112,9 +115,10 @@ export function initializeScreenshotService(
   const useLinuxCapture = process.platform === "linux"
     && (process.env.XDG_SESSION_TYPE === "wayland" || Boolean(process.env.WAYLAND_DISPLAY));
   const capture = useLinuxCapture
-    ? async (interactive: boolean) => {
+    ? async (interactive: boolean, target?: "region" | "window") => {
       const filePath = await captureLinuxScreenshot({
         interactive,
+        target: target ?? (interactive ? "region" : "screen"),
         outputDirectory: screenshotDirectory,
       });
       const image = nativeImage.createFromPath(filePath);
@@ -245,7 +249,14 @@ export function initializeScreenshotService(
   } else if (useLinuxCapture) {
     console.log("[Screenshot] Linux Wayland backend: grim/slurp (Hyprland) or xdg-desktop-portal");
   }
-  setScreenshotControlHandler(async () => { await service.startFromHotkey(); });
+  setScreenshotControlHandler(async () => {
+    const result = await service.startFromHotkey();
+    if (!result.ok) throw new Error(result.reason ?? "SCREENSHOT_FAILED");
+  });
+  setScreenshotWindowControlHandler(async () => {
+    const result = await service.startFromChatButton(undefined, "window");
+    if (!result.ok) throw new Error(result.reason ?? "SCREENSHOT_FAILED");
+  });
   hyprlandHotkey = installHyprlandScreenshotHotkey(options.initialHotkey);
   if (hyprlandHotkey) {
     app.once("will-quit", () => hyprlandHotkey?.uninstall());
