@@ -60,7 +60,8 @@
     "test:plugin-examples": "node scripts/plugin-sdk/test-examples.mjs",
     "release": "commit-and-tag-version",
     "release:dry": "commit-and-tag-version --dry-run",
-    "build:overlay-host": "node scripts/build/overlay-host.mjs"
+    "build:overlay-host": "node scripts/build/overlay-host.mjs",
+    "verify:linux-artifacts": "node scripts/verify/linux-artifacts.mjs"
   },
   "engines": {
     "node": ">=24 <25",

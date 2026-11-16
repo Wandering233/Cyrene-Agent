@@ -86,7 +86,7 @@
 | TRAY-03 | ❌ | GNOME AppIndicator 提示 | 无 | 检测扩展/提示安装 | P1 |
 | FOCUS-01 | ❌ | `xdg-activation` 支持 | 只有应用内 activation broker | 获取/使用 activation token | P0 |
 | FOCUS-02 | ❌ | 后台主动弹窗焦点 | 依赖 `show()/focus()` | 通知/激活 token；不抢焦点策略 | P0 |
-| FOCUS-03 | ❌ | 第二实例激活 | 无 Wayland 专门处理 | 单实例 socket/DBus 激活 | P1 |
+| FOCUS-03 | ✅ | 第二实例激活 | 实机第二实例退出后，第一实例打开聊天窗（`昔涟 · 聊天（React）`） | 已验收 | P1 |
 | FOCUS-04 | ❌ | 通知动作打开窗口 | 未验证 | `org.freedesktop.Notifications` action | P2 |
 
 ---
@@ -96,10 +96,10 @@
 | ID | 状态 | 任务 | 核对证据/现状 | 剩余工作与验收 | 优先级 |
 |---|---|---|---|---|---|
 | AUTO-01 | ✅ | XDG autostart | 打包版以临时 `XDG_CONFIG_HOME` 实测写入/移除 `autostart/cyrene.desktop` | 已验收 | P0 |
-| AUTO-02 | ✅ | AppImage/目录版路径 | 打包版写入的 Exec 指向 `release/linux-unpacked/cyrene` | AppImage 实机仍是待验 | P0 |
+| AUTO-02 | ✅ | AppImage/目录版路径 | AppImage 实机：`XDG_CONFIG_HOME/autostart/cyrene.desktop` 的 Exec 指向 AppImage + `--autostart`，桌宠正常出现 | 已验收 | P0 |
 | AUTO-03 | ✅ | `--autostart` 静默启动 | 打包版 `--autostart` 实测只显示桌宠/overlay，不显示聊天窗 | 已验收 | P0 |
 | AUTO-04 | ✅ | 设置与文件同步/测试 | `launch-at-login.test.ts` 覆盖写入/移除/AppImage 转义/dev 跳过 | 路径失效实机验证 | P1 |
-| UPD-01 | 🟡 | AppImage 更新 feed | electron-builder 已配置 GitHub publish + AppImage target；更新服务已加 AppImage 检测 | 实际生成/上传 `latest-linux.yml` 并实机更新 | P0 |
+| UPD-01 | 🟡 | AppImage 更新 feed | `latest-linux.yml` 已生成（version/sha512/AppImage path）；`verify:linux-artifacts` 校验通过 | 上传 release assets + 实机升级 | P0 |
 | UPD-02 | ❌ | Linux release 资产 | electron-builder 有 Linux target，无发布流程 | GitHub Release 上传 AppImage/tar.gz/yml | P0 |
 | UPD-03 | ✅ | `APPIMAGE` 检测/手动更新 | 打包 Linux 无 `APPIMAGE` 时更新状态为 `error: unsupported`，UI 已加中/英/日文案；AppImage 才启用 | 已验收 | P0 |
 | UPD-04 | ❌ | 更新签名/校验 | 无 Linux 签名 | minisign/GPG 或 sha512 + 文档 | P1 |
@@ -135,7 +135,7 @@
 | QA-03 | ❌ | 性能/内存/句柄泄漏 | 只测 59fps | 长跑、CPU、RSS、fd、延迟 | P1 |
 | QA-04 | ❌ | 失败路径 | 手工测 `/bin/false` | 超时/崩溃/协议错/socket 拒绝 | P1 |
 | QA-05 | ❌ | 协议 fuzz/边界 | 基本尺寸校验 | 畸形帧/超大尺寸/半包/乱序 | P2 |
-| QA-06 | ❌ | 打包产物测试 | unpacked 手工验证 | AppImage 实机、多架构、升级 | P1 |
+| QA-06 | 🟡 | 打包产物测试 | AppImage 实机 + autostart 验证；`verify:linux-artifacts` 检查 AppImage/latest-linux.yml/两个宿主 | 多架构、真实升级 | P1 |
 | QA-07 | ❌ | Linux CI | 无 Rust/Linux E2E job | GitHub Actions 矩阵 | P0 |
 | QA-08 | ❌ | 无障碍/减少动画 | 无 | 键盘操作、对比度、reduced motion | P2 |
 
