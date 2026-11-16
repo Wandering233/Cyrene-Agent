@@ -21,6 +21,7 @@ import { logger, LogTag } from "../logger";
 import { renderBanner } from "../../shared/banner";
 import { IPC } from "../../shared/ipc-channels";
 import { isDev } from "../env";
+import { withLinuxCursorFallback } from "../linux/cursor-position";
 import {
   loadGeneralSettings,
   saveGeneralSettings,
@@ -846,7 +847,7 @@ export function createDefaultApplicationDependencies(): ApplicationDependencies 
           createWindow: createToastWindowShell,
           getChatWindow: () => reactChatWindow,
           getDisplayMatching: (bounds) => screen.getDisplayMatching(bounds),
-          getCursorScreenPoint: () => screen.getCursorScreenPoint(),
+          getCursorScreenPoint: () => withLinuxCursorFallback(() => screen.getCursorScreenPoint()),
           createOverlayController: () => {
             if (process.platform !== "linux" || !shouldUsePetOverlay() || resolveOverlayBackend() !== "layer") {
               return null;
@@ -858,7 +859,7 @@ export function createDefaultApplicationDependencies(): ApplicationDependencies 
                   const chat = reactChatWindow;
                   const display = chat && !chat.isDestroyed()
                     ? screen.getDisplayMatching(chat.getBounds())
-                    : screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+                    : screen.getDisplayNearestPoint(withLinuxCursorFallback(() => screen.getCursorScreenPoint()));
                   return { workArea: display.workArea, label: display.label };
                 },
               });

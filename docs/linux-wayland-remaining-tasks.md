@@ -3,7 +3,7 @@
 > 基线：`e42a45b4 feat(跨平台): 增加 Linux Wayland 原生桌宠 overlay`
 > 环境：Arch Linux + Hyprland 0.57.1 + Wayland，Electron 44.7.2
 > 说明：本文是**全量任务清单与逐项核对结果**；已完成项会随实现更新。
-> 最近更新：隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
+> 最近更新：Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
 
 ## 状态图例
 
@@ -115,7 +115,7 @@
 | SBX-08 | ✅ | GUI 命令 Wayland socket | 实机 bwrap 内可访问 `/run/user/1000/wayland-1` 与 lock 文件，`WAYLAND_DISPLAY=wayland-1` | 已验收 | P2 |
 | WIN-01 | ❌ | 普通窗口定位/居中/恢复 | `toast-window.ts` 用 `setBounds`；Wayland 无效 | 宿主化或接受合成器放置 | P1 |
 | WIN-02 | ❌ | 普通窗口置顶 | `setAlwaysOnTop` 原生 Wayland 无效 | 仅桌宠有方案；普通窗口需 layer-shell/扩展 | P1 |
-| WIN-03 | ❌ | 全局光标查询 | `screen.getCursorScreenPoint()` 返回 0,0 | 仅桌宠宿主局部坐标；需 per-DE/InputCapture | P1 |
+| WIN-03 | 🟡 | 全局光标查询 | Electron 返回 0,0；新增 Hyprland `hyprctl -j cursorpos` 回退（100ms 缓存），用于 toast/窗口显示器选择 | 其他 DE/InputCapture；真实多屏光标 | P1 |
 | WIN-04 | ❌ | 透明/焦点/激活 | 未系统验证 | 透明窗口、后台激活、焦点窃取 | P1 |
 | WIN-05 | ❌ | 剪贴板/文件选择/拖放/密钥环 | 未做 Wayland 回归 | 逐项验证并修复 | P1 |
 | WIN-06 | ❌ | 屏幕录制/desktopCapturer | 未验证 | PipeWire/ScreenCast/restore token | P2 |

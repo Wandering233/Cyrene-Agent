@@ -1,4 +1,5 @@
 import { app, BrowserWindow, screen, type NativeImage } from "electron";
+import { withLinuxCursorFallback } from "../linux/cursor-position";
 import { IPC } from "../../shared/ipc-channels";
 import { createPetWindow, PET_WINDOW_BASE_HEIGHT, PET_WINDOW_BASE_WIDTH, type PetWindowSettingsSlice } from "../startup/create-pet-window";
 import {
@@ -442,7 +443,7 @@ export function createWindowManager(options: WindowManagerOptions): WindowManage
       }
     },
     getCursorScreenPosition(): { x: number; y: number } {
-      return screen.getCursorScreenPoint();
+      return withLinuxCursorFallback(() => screen.getCursorScreenPoint());
     },
     setIconForAllWindows(icon: NativeImage): void {
       for (const win of BrowserWindow.getAllWindows()) {

@@ -1,4 +1,5 @@
 import { app, BrowserWindow, screen } from "electron";
+import { withLinuxCursorFallback } from "../linux/cursor-position";
 import * as path from "path";
 import { IPC } from "../../shared/ipc-channels";
 import { isDev } from "../env";
@@ -54,7 +55,9 @@ export function createReactChatWindowShell(): BrowserWindow {
   // 新建窗口：dispatcher 重置；pending 仅服务于"未 ready 期间又收到请求"
   reactChatSession.reset();
 
-  const workArea = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+  const workArea = screen.getDisplayNearestPoint(
+    withLinuxCursorFallback(() => screen.getCursorScreenPoint()),
+  ).workArea;
   const bounds = getWorkspaceInitialBounds(workArea);
   const { rememberWindowState, uiTheme } = loadGeneralSettings();
   // 非透明窗口：底色跟随主题，避免暗色主题启动瞬间闪白
