@@ -62,6 +62,25 @@ function isLinux(): boolean {
 }
 
 /**
+ * Ubuntu 24.04+ restricts unprivileged user namespaces via AppArmor. bubblewrap
+ * then fails with EPERM unless the app/profile is allowed. Detect it so the
+ * startup log can point at the real cause instead of a generic wrap failure.
+ */
+export function detectAppArmorUsernsRestriction(
+  readFile: (file: string) => string = (file) => fs.readFileSync(file, "utf8"),
+): string | null {
+  if (!isLinux()) return null;
+  try {
+    const value = readFile("/proc/sys/kernel/apparmor_restrict_unprivileged_userns").trim();
+    return value === "1"
+      ? "AppArmor restricts unprivileged user namespaces; bubblewrap may fail with EPERM"
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * 打包后 vendor/srt-win 由 electron-builder 的 asarUnpack 解到 app.asar.unpacked，
  * 但包内 VENDORED_SRT_WIN_EXE 常量仍指向 app.asar 虚拟路径 ——
  * spawn 无法执行 asar 虚拟路径里的 exe（ENOENT），需重写到真实磁盘路径。
@@ -236,6 +255,8 @@ export async function initSandbox(): Promise<void> {
     srtModule = await import("@anthropic-ai/sandbox-runtime");
 
     if (isLinux()) {
+      const appArmor = detectAppArmorUsernsRestriction();
+      if (appArmor) logger.warn(LogTag.Runtime, `[Sandbox] ${appArmor}`);
       const deps = await srtModule.SandboxManager.checkDependenciesAsync();
       if (deps.errors.length > 0) {
         sandboxDependencyErrors = deps.errors;
@@ -329,6 +350,8 @@ export async function ensureSandboxReady(cwd: string = process.cwd(), trustedWor
 
   try {
     if (isLinux()) {
+      const appArmor = detectAppArmorUsernsRestriction();
+      if (appArmor) logger.warn(LogTag.Runtime, `[Sandbox] ${appArmor}`);
       const deps = await srtModule.SandboxManager.checkDependenciesAsync();
       if (deps.errors.length > 0) {
         sandboxDependencyErrors = deps.errors;

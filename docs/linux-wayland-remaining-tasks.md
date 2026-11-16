@@ -69,7 +69,7 @@
 | SHOT-02 | 🟡 | 全屏/区域/窗口截图 | Hyprland：grim 全屏实测、slurp 选择取消路径实测；区域选择成功待人工 | 窗口截图/多屏 | P0 |
 | SHOT-03 | ✅ | 标注 overlay | 新增 Electron 标注窗口（画笔/矩形/箭头/撤销/清空/保存/取消）；自动化保存实测生成同尺寸 annotated PNG | 文字/马赛克可后续 | P0 |
 | SHOT-04 | ✅ | 剪贴板/文件保存 | 截图/标注写入 userData/screenshots；热键 ClipboardItem 写剪贴板（Electron 实测读回 image/png）；标注保存实测 | 已验收 | P0 |
-| SHOT-05 | ❌ | 多屏/HiDPI 截图 | 无 | 区域坐标、缩放换算 | P0 |
+| SHOT-05 | 🟡 | 多屏/HiDPI 截图 | HEADLESS 2x 输出加入后 grim 全屏截图 6396×2984，包含多输出；区域坐标/单输出选择待验证 | 区域跨屏、缩放换算 | P0 |
 | SHOT-06 | 🟡 | DE 兜底 | Hyprland grim/slurp 已实现；其他 DE 走 portal | KDE Spectacle/GNOME DBus、grim 缺失回退 | P1 |
 | SHOT-07 | ✅ | 全局截图热键 | Hyprland 自动 `hl.bind("ALT+SHIFT+S")` → control socket → grim；实机按键生成 949KB PNG；Electron globalShortcut 在 Wayland 不可靠时由桌面 bind 兜底 | KDE/GNOME portal 仍待适配 | P0 |
 | SHOT-08 | 🟡 | 权限/隐私/临时文件 | 截图文件 0600；portal 原文件删除；启动清理 7 天/100 个上限；单测覆盖 | 权限提示/失败清理边界 | P1 |
@@ -110,9 +110,9 @@
 | SBX-03 | ✅ | seccomp 二进制 asarUnpack | electron-builder asarUnpack 增加 `@anthropic-ai/sandbox-runtime/vendor/seccomp/**`；打包目录验证解包路径 | 已验收 | P1 |
 | SBX-04 | ✅ | 档位映射 | Linux config 省略 windows；实机 read/write allowWrite 档位 bwrap 执行成功；Linux 单测覆盖 | 已验收 | P0 |
 | SBX-05 | ❌ | 网络 allowlist/DNS/代理 | 无 Linux 网络沙箱 | socat 桥、域名白名单 | P1 |
-| SBX-06 | ❌ | AppArmor/userns 检测 | 无 | Ubuntu 24.04 检测与提示 | P1 |
+| SBX-06 | 🟡 | AppArmor/userns 检测 | 新增 `/proc/sys/kernel/apparmor_restrict_unprivileged_userns` 检测并写启动警告；单测覆盖 | Ubuntu 24.04 实机复现/修复指引 | P1 |
 | SBX-07 | ✅ | fail-closed 错误/测试 | 缺 socat 时 not_ready；补齐依赖后真实 bwrap 命令成功；单测覆盖两条路径 | 已验收 | P1 |
-| SBX-08 | ❌ | GUI 命令 Wayland socket | 无 | bwrap 绑定 `XDG_RUNTIME_DIR/wayland-*` | P2 |
+| SBX-08 | ✅ | GUI 命令 Wayland socket | 实机 bwrap 内可访问 `/run/user/1000/wayland-1` 与 lock 文件，`WAYLAND_DISPLAY=wayland-1` | 已验收 | P2 |
 | WIN-01 | ❌ | 普通窗口定位/居中/恢复 | `toast-window.ts` 用 `setBounds`；Wayland 无效 | 宿主化或接受合成器放置 | P1 |
 | WIN-02 | ❌ | 普通窗口置顶 | `setAlwaysOnTop` 原生 Wayland 无效 | 仅桌宠有方案；普通窗口需 layer-shell/扩展 | P1 |
 | WIN-03 | ❌ | 全局光标查询 | `screen.getCursorScreenPoint()` 返回 0,0 | 仅桌宠宿主局部坐标；需 per-DE/InputCapture | P1 |

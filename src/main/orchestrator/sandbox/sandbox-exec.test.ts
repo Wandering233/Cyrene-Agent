@@ -543,3 +543,13 @@ describe("resetSandbox", () => {
     await expect(sb.resetSandbox()).resolves.toBeUndefined();
   });
 });
+
+
+describe("detectAppArmorUsernsRestriction", () => {
+  it("warns only when the kernel reports restriction = 1", () => {
+    Object.defineProperty(process, "platform", { value: "linux", configurable: true });
+    expect(sb.detectAppArmorUsernsRestriction(() => "1\n")).toContain("AppArmor");
+    expect(sb.detectAppArmorUsernsRestriction(() => "0\n")).toBeNull();
+    expect(sb.detectAppArmorUsernsRestriction(() => { throw new Error("missing"); })).toBeNull();
+  });
+});
