@@ -138,7 +138,13 @@ let lastReportedHeight = 0;
  */
 function reportHeight(): void {
   if (!stack) return;
+  // Measure the intrinsic content height, not the height clipped by the
+  // current window. Otherwise the main process resizes the window to the
+  // reported height, which changes scrollHeight again -> resize loop.
+  const previousMaxHeight = stack.style.maxHeight;
+  stack.style.maxHeight = "none";
   const height = stack.scrollHeight;
+  stack.style.maxHeight = previousMaxHeight;
   if (height === lastReportedHeight) return;
   lastReportedHeight = height;
   api?.reportHeight(height);
