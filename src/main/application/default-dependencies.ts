@@ -108,6 +108,7 @@ import { registerMomentsIpc } from "../moments/moments-ipc";
 import { registerChatUiIpc, getActiveChatSessionId } from "../chats/chat-ui-ipc";
 import { createToastWindowController } from "../toast/toast-window";
 import { createToastOverlayController } from "../toast/toast-overlay";
+import { setToastTestControlHandler } from "../control/control-server";
 import { resolveOverlayBackend, shouldUsePetOverlay } from "../pet-overlay";
 import { createToastService } from "../toast/toast-service";
 import { toastEvents } from "../toast/toast-events";
@@ -882,6 +883,16 @@ export function createDefaultApplicationDependencies(): ApplicationDependencies 
             if (!chat || chat.isDestroyed() || !chat.isFocused()) return false;
             return getActiveChatSessionId() === event.sessionId;
           },
+        });
+
+        setToastTestControlHandler(() => {
+          toastEvents.publishSchedulerFinished({
+            schedulerRunId: `control-test-${Date.now()}`,
+            taskId: "control-test",
+            taskTitle: "Cyrene Toast 测试",
+            status: "success",
+            outputPreview: "来自本地控制通道的 Wayland overlay 测试",
+          });
         });
         toastService.registerIpc(ipc);
         // 预创建隐藏窗口，提前加载渲染页，首次弹出零延迟

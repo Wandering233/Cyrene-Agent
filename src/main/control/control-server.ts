@@ -16,8 +16,15 @@ export interface ControlServerHandlers {
 }
 
 let screenshotHandler: (() => void | Promise<void>) | null = null;
+let toastTestHandler: (() => void | Promise<void>) | null = null;
 
 /** Register the screenshot action after the core screenshot service exists. */
+export function setToastTestControlHandler(
+  handler: (() => void | Promise<void>) | null,
+): void {
+  toastTestHandler = handler;
+}
+
 export function setScreenshotControlHandler(
   handler: (() => void | Promise<void>) | null,
 ): void {
@@ -75,8 +82,11 @@ export function startControlServer(
       if (command === "screenshot") {
         if (!screenshotHandler) throw new Error("screenshot backend not ready");
         await screenshotHandler();
+      } else if (command === "toast-test") {
+        if (!toastTestHandler) throw new Error("toast backend not ready");
+        await toastTestHandler();
       } else {
-        await handlers[command as Exclude<ControlCommand, "ping" | "screenshot">]();
+        await handlers[command as Exclude<ControlCommand, "ping" | "screenshot" | "toast-test">]();
       }
       socket.write(JSON.stringify({ ok: true, command }) + "\n");
     } catch (error) {

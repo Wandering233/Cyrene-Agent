@@ -6,6 +6,7 @@ export const CONTROL_COMMANDS = [
   "show-settings",
   "toggle-pet",
   "screenshot",
+  "toast-test",
   "quit",
   "ping",
 ] as const;

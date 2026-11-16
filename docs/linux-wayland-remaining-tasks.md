@@ -3,7 +3,7 @@
 > 基线：`e42a45b4 feat(跨平台): 增加 Linux Wayland 原生桌宠 overlay`
 > 环境：Arch Linux + Hyprland 0.57.1 + Wayland，Electron 44.7.2
 > 说明：本文是**全量任务清单与逐项核对结果**；已完成项会随实现更新。
-> 最近更新：GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
+> 最近更新：Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
 
 ## 状态图例
 
@@ -73,9 +73,9 @@
 | SHOT-06 | 🟡 | DE 兜底 | Hyprland grim/slurp 已实现；其他 DE 走 portal | KDE Spectacle/GNOME DBus、grim 缺失回退 | P1 |
 | SHOT-07 | ✅ | 全局截图热键 | Hyprland 自动 `hl.bind("ALT+SHIFT+S")` → control socket → grim；实机按键生成 949KB PNG；Electron globalShortcut 在 Wayland 不可靠时由桌面 bind 兜底 | KDE/GNOME portal 仍待适配 | P0 |
 | SHOT-08 | 🟡 | 权限/隐私/临时文件 | 截图文件 0600；portal 原文件删除；启动清理 7 天/100 个上限；单测覆盖 | 权限提示/失败清理边界 | P1 |
-| TOAST-01 | 🟡 | Toast 使用原生 overlay host | 新增 `toast-overlay.ts`：offscreen toast 页 + layer host；普通 BrowserWindow 仍为 fallback | 内容渲染/生命周期与主 service 联调 | P0 |
-| TOAST-02 | 🟡 | Toast 光标/角落定位 | layer host 实测位于 [1798,1342,440,150]（右下角）；多屏/HiDPI 待验证 | 多屏、缩放、内容高度 | P0 |
-| TOAST-03 | 🟡 | Toast 穿透/点击 | 复用 host alpha input region 与指针转发 | 实际卡片点击/穿透联调 | P0 |
+| TOAST-01 | ✅ | Toast 使用原生 overlay host | 真实主应用 `control toast-test` 触发：offscreen toast 页 → layer host，内容截图有 1229 色；普通 BrowserWindow 仍为 fallback | 已验收 | P0 |
+| TOAST-02 | ✅ | Toast 光标/角落定位 | 实测 layer 位于 [1798,1392,440,100]（右下角）；高度协议 28/58/100 正常 | 已验收 | P0 |
+| TOAST-03 | ✅ | Toast 穿透/点击 | 点击卡片中心后聊天窗口被激活（`昔涟 · 聊天（React）`）；host alpha input region + 指针转发生效 | 已验收 | P0 |
 | GS-01 | 🟡 | 直接接 GlobalShortcuts portal | 新增 portal 客户端；打包版 + desktop 文件实测 `hyprctl globalshortcuts` 出现 `cyrene:screenshot`；dev 无 app id 自动回退 | Activated 信号未在 uinput 合成键下触发；真实按键/KDE/GNOME 验证 | P0 |
 | GS-02 | ❌ | 授权/冲突/拒绝 | 无 | 首次授权、冲突提示、禁用状态 | P0 |
 | GS-03 | ❌ | 真实按键触发验证 | `register()` true，合成按键未触发 | 真实按键/portal 事件测试 | P0 |
