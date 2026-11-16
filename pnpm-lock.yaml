@@ -27,8 +27,8 @@ importers:
         specifier: 3.0.71
         version: 3.0.71(zod@4.6.7)
       '@anthropic-ai/sandbox-runtime':
-        specifier: ^0.0.80
-        version: 0.0.80
+        specifier: ^0.0.83
+        version: 0.0.83
       '@anthropic-ai/sdk':
         specifier: ^0.126.0
         version: 0.126.0(zod@4.6.7)
@@ -490,10 +490,15 @@ packages:
   '@antfu/install-pkg@1.1.0':
     resolution: {integrity: sha512-MGQsmw10ZyI+EJo45CdSER4zEb+p31LpDAFp2Z3gkSd1yqVZGi0Ebx++YTEMonJy4oChEMLsxZ64j8FH6sSqtQ==}
 
-  '@anthropic-ai/sandbox-runtime@0.0.80':
-    resolution: {integrity: sha512-WG4P8faU/JDH90I8NLUBPmg7e72zhanlW3AVCD0OF06JCtId9IDFewFgv4YRvHLcnn//h1r6a1AMosBsMLpxnA==}
+  '@anthropic-ai/sandbox-runtime@0.0.83':
+    resolution: {integrity: sha512-yEusORnVJrNseF/9fvjVYyk6tr79/aFbIB3T/X8p2puLZdaaiGNeYN50v0CE+1DT70v7XuzKOAnTivh1f5cksA==}
     engines: {node: '>=22.12.0'}
     hasBin: true
+    peerDependencies:
+      '@microsoft/mxc-sdk': ^1.0.1
+    peerDependenciesMeta:
+      '@microsoft/mxc-sdk':
+        optional: true
 
   '@anthropic-ai/sdk@0.126.0':
     resolution: {integrity: sha512-VhiZl6rA/8uC+MgDaOhEcAWaIZ2tPnIY885jlZqxrGrutUW2nqCtophBtlsX0tk5kChBUjV/1NVjL3y0M4OwUg==}
@@ -8535,7 +8540,7 @@ snapshots:
       package-manager-detector: 1.8.0
       tinyexec: 1.3.1
 
-  '@anthropic-ai/sandbox-runtime@0.0.80':
+  '@anthropic-ai/sandbox-runtime@0.0.83':
     dependencies:
       '@pondwader/socks5-server': 1.0.10
       commander: 12.1.0
