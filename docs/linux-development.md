@@ -1,6 +1,6 @@
 # Linux 开发与适配说明
 
-本分支（`feat/linux-support`）用于在 Linux 实机上持续开发 Cyrene。当前基线不是“完整 Linux 发行版”，而是一套可编译、可启动、可打包、可跑测试的开发环境；Windows 专用能力会显式降级或禁用，避免静默失败。
+本分支（`cyreneOnHyprland`）用于在 Linux 实机上持续开发 Cyrene。当前基线不是“完整 Linux 发行版”，而是一套可编译、可启动、可打包、可跑测试的开发环境；Windows 专用能力会显式降级或禁用，避免静默失败。
 
 ## 已验证环境
 

@@ -1,6 +1,6 @@
 # Linux / Wayland 受限能力适配方案
 
-> 适用分支：`feat/linux-support`
+> 适用分支：`cyreneOnHyprland`
 > 基线环境：Arch Linux + Hyprland 0.57.1 + Wayland，Electron 44.7.2，Node 24.14.0，XWayland `DISPLAY=:0`
 > 本文是方案，不代表这些能力已经全部实现；当前已落地的范围见 `docs/linux-development.md`。
 
