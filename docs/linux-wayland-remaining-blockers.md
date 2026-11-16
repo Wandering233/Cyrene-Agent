@@ -14,7 +14,7 @@
 ## Electron/合成器限制
 
 - Native Wayland 下 Electron `setBounds`/`setAlwaysOnTop` 对普通窗口无效。  
-  Hyprland Lua `window.move({relative=true})` 可移动到目标位置；但 `window.resize` 会重排/居中，Electron 随后的 setBounds 又铺回 tiled；WIN-01 未完成。
+  Hyprland Lua `window.move({relative=true})` 可移动到目标位置；`resize`/Electron setBounds 会重排回 tiled。已尝试跳过 Hyprland 下的 setBounds，窗口仍保持 tiled；WIN-01 未完成。
 - uinput 虚拟触摸屏未被 Hyprland 识别为 touch 设备，OVL-20 只能在真实触控硬件上验收。
 - xdg-activation token 未暴露给 Electron：FOCUS-01/02 未完成。
 - 系统通知 action 未接入：FOCUS-04 未完成。
