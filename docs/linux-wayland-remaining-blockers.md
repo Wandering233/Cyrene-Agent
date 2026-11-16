@@ -13,7 +13,8 @@
 
 ## Electron/合成器限制
 
-- Native Wayland 下 Electron `setBounds`/`setAlwaysOnTop` 对普通窗口无效；Hyprland Lua move/resize 实测被居中，WIN-01/02 未完成。
+- Native Wayland 下 Electron `setBounds`/`setAlwaysOnTop` 对普通窗口无效。  
+  Hyprland Lua `window.move({relative=true})` 可移动到目标位置，但 `window.resize` 会重排/居中，Electron 随后的 setBounds 又会把窗口重新铺回 tiled；WIN-01 未完成。
 - xdg-activation token 未暴露给 Electron：FOCUS-01/02 未完成。
 - 系统通知 action 未接入：FOCUS-04 未完成。
 
