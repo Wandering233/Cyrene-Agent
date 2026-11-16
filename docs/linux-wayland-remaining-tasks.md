@@ -3,7 +3,7 @@
 > 基线：`e42a45b4 feat(跨平台): 增加 Linux Wayland 原生桌宠 overlay`
 > 环境：Arch Linux + Hyprland 0.57.1 + Wayland，Electron 44.7.2
 > 说明：本文是**全量任务清单与逐项核对结果**；已完成项会随实现更新。
-> 最近更新：Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
+> 最近更新：overlay 帧统计；Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
 
 ## 状态图例
 
@@ -45,8 +45,8 @@
 | OVL-12 | 🟡 | 协议版本握手/能力协商 | 宿主错误事件 `PROTOCOL_MISMATCH` 客户端测试通过；init 携带 protocol | 真实宿主不匹配端到端 | P1 |
 | OVL-13 | 🟡 | socket/多实例/stale 清理 | 新增 fake host 集成测试：0600、ready/init/pointer、stop 删除 socket | 并发启动、异常退出/残留 | P1 |
 | OVL-14 | ❌ | shared texture/DMA-BUF 零拷贝 | 当前 CPU bitmap + socket 拷贝 | 评估 `offscreen.useSharedTexture`，降 CPU/延迟 | P2 |
-| OVL-15 | ❌ | 4K/120Hz/大尺寸性能 | 只测 400×500 约 59fps | 4K/600×750/120Hz 基准与优化 | P1 |
-| OVL-16 | ❌ | 丢帧/背压/延迟指标 | 仅 `writableLength` 简单丢弃 | 端到端延迟、队列深度、可观测性 | P2 |
+| OVL-15 | 🟡 | 4K/120Hz/大尺寸性能 | 400×500 实测 10s 发送 561 帧（约 56fps）、0 丢帧；4K/120Hz 未测 | 4K/600×750/120Hz 基准 | P1 |
+| OVL-16 | 🟡 | 丢帧/背压/延迟指标 | 新增 frames sent/dropped/restarts 统计与 10s 日志；实测 561/0/0 | 端到端延迟、队列深度 | P2 |
 | OVL-17 | ✅ | 滚轮/axis 输入 | 宿主转发 axis 增量；实测 uinput wheel → `mouseWheel` → 渲染页 `wheel`（±15） | 已验收 | P1 |
 | OVL-18 | 🟡 | 双击/右键/上下文菜单 | 已加 400ms/4px clickCount；右键 down/up 转发 | 真实双击/右键菜单/长按实机 | P1 |
 | OVL-19 | ❌ | 鼠标指针形状 | 宿主未设置 cursor | 拖拽/缩放/可点击区域 cursor | P2 |

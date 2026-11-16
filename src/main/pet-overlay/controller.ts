@@ -75,6 +75,9 @@ export class PetOverlayController {
     count: number;
   } | null = null;
   private frameSeq = 0;
+  private framesSent = 0;
+  private framesDropped = 0;
+  private lastStatsAt = Date.now();
   private readyEmitted = false;
   private pageLoaded = false;
 
@@ -134,6 +137,10 @@ export class PetOverlayController {
     }
 
     void this.startHost();
+  }
+
+  getFrameStats(): { sent: number; dropped: number; restarts: number } {
+    return { sent: this.framesSent, dropped: this.framesDropped, restarts: this.restartAttempts };
   }
 
   getPosition(): { x: number; y: number } {
@@ -367,7 +374,18 @@ export class PetOverlayController {
       frame.width,
       frame.height,
     );
-    if (sent) this.latest = null;
+    if (sent) {
+      this.framesSent += 1;
+      this.latest = null;
+    } else {
+      this.framesDropped += 1;
+    }
+    if (Date.now() - this.lastStatsAt >= 10_000) {
+      this.lastStatsAt = Date.now();
+      console.info(
+        `[PetOverlay] frames sent=${this.framesSent} dropped=${this.framesDropped} restarts=${this.restartAttempts}`,
+      );
+    }
   }
 
   private emitReady(): void {
