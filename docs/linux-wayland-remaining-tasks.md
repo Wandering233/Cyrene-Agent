@@ -3,7 +3,7 @@
 > 基线：`e42a45b4 feat(跨平台): 增加 Linux Wayland 原生桌宠 overlay`
 > 环境：Arch Linux + Hyprland 0.57.1 + Wayland，Electron 44.7.2
 > 说明：本文是**全量任务清单与逐项核对结果**；已完成项会随实现更新。
-> 最近更新：Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
+> 最近更新：host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
 
 ## 状态图例
 
@@ -43,7 +43,7 @@
 | OVL-10 | 🟡 | 全屏/锁屏/通知 z-order | 只验证普通窗口 | 全屏游戏、锁屏、通知中心、面板遮挡 | P1 |
 | OVL-11 | ✅ | 宿主崩溃自动重启/watchdog | 3 次退避重启（500/1500/3000ms）；实测 kill -9 后新宿主启动、layer/位置恢复；不可恢复错误直接回退 | 长时间 watchdog 仍可加强 | P1 |
 | OVL-12 | 🟡 | 协议版本握手/能力协商 | init/ready 带 `protocol:1`；宿主不匹配发 `PROTOCOL_MISMATCH` 并退出 | 端到端不匹配实测 | P1 |
-| OVL-13 | 🟡 | socket/多实例/stale 清理 | 已 `chmod 0600`、按 PID 命名、退出删除 | 并发启动、残留 socket、异常退出测试 | P1 |
+| OVL-13 | 🟡 | socket/多实例/stale 清理 | 新增 fake host 集成测试：0600、ready/init/pointer、stop 删除 socket | 并发启动、异常退出/残留 | P1 |
 | OVL-14 | ❌ | shared texture/DMA-BUF 零拷贝 | 当前 CPU bitmap + socket 拷贝 | 评估 `offscreen.useSharedTexture`，降 CPU/延迟 | P2 |
 | OVL-15 | ❌ | 4K/120Hz/大尺寸性能 | 只测 400×500 约 59fps | 4K/600×750/120Hz 基准与优化 | P1 |
 | OVL-16 | ❌ | 丢帧/背压/延迟指标 | 仅 `writableLength` 简单丢弃 | 端到端延迟、队列深度、可观测性 | P2 |
@@ -130,10 +130,10 @@
 
 | ID | 状态 | 任务 | 核对证据/现状 | 剩余工作与验收 | 优先级 |
 |---|---|---|---|---|---|
-| QA-01 | ❌ | 宿主集成测试 | 只有 Rust 单元测试 + 手工 E2E | 假 compositor/协议回放/输入区域断言 | P0 |
+| QA-01 | 🟡 | 宿主集成测试 | 新增 `host-client.test.ts` 假宿主：ready/init/pointer/cleanup；Rust 单测保留 | 假 compositor、输入区域断言 | P0 |
 | QA-02 | ❌ | 合成器 E2E 矩阵 | 只测 Hyprland | KDE/Sway/GNOME/多屏/4K | P0 |
 | QA-03 | ❌ | 性能/内存/句柄泄漏 | 只测 59fps | 长跑、CPU、RSS、fd、延迟 | P1 |
-| QA-04 | ❌ | 失败路径 | 手工测 `/bin/false` | 超时/崩溃/协议错/socket 拒绝 | P1 |
+| QA-04 | 🟡 | 失败路径 | host client 集成测试覆盖启动/停止/socket 权限；崩溃/超时/协议错仍待补 | 超时/崩溃/协议错/socket 拒绝 | P1 |
 | QA-05 | 🟡 | 协议 fuzz/边界 | Rust 边界测试覆盖 stride 溢出/零 stride；Jet 边界畸形帧仍待补 | 畸形帧/半包/乱序 fuzz | P2 |
 | QA-06 | 🟡 | 打包产物测试 | AppImage 实机 + autostart 验证；`verify:linux-artifacts` 检查 AppImage/latest-linux.yml/两个宿主 | 多架构、真实升级 | P1 |
 | QA-07 | 🟡 | Linux CI | 新增 `.github/workflows/linux.yml`：Node checks/test + Rust test/build 两 job；尚未实际跑 CI | 远程 CI 首跑、E2E 矩阵 | P0 |

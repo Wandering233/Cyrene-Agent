@@ -1,0 +1,67 @@
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { PetOverlayHostClient } from "./host-client";
+
+const tempDirs: string[] = [];
+
+function makeFakeHost(): string {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cyrene-host-client-test-"));
+  tempDirs.push(dir);
+  const script = path.join(dir, "fake-host.mjs");
+  fs.writeFileSync(script, `#!/usr/bin/env node
+import net from "node:net";
+const index = process.argv.indexOf("--socket");
+const socketPath = process.argv[index + 1];
+const socket = net.createConnection(socketPath);
+socket.setEncoding("utf8");
+socket.write(JSON.stringify({ type: "ready", protocol: 1, width: 400, height: 500, output: "TEST-1", scale: 1 }) + "\\n");
+let buffer = "";
+socket.on("data", (chunk) => {
+  buffer += chunk;
+  let newline;
+  while ((newline = buffer.indexOf("\\n")) >= 0) {
+    const line = buffer.slice(0, newline);
+    buffer = buffer.slice(newline + 1);
+    if (!line) continue;
+    const message = JSON.parse(line);
+    if (message.type === "init") {
+      socket.write(JSON.stringify({ type: "pointer", event: "enter", x: 12, y: 34 }) + "\\n");
+    }
+    if (message.type === "quit") process.exit(0);
+  }
+});
+socket.on("error", () => process.exit(1));
+`, { mode: 0o755 });
+  return script;
+}
+
+afterEach(() => {
+  for (const dir of tempDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
+});
+
+describe("PetOverlayHostClient", () => {
+  it("starts the host, sends init, receives pointer events and cleans up", async () => {
+    const script = makeFakeHost();
+    const events: unknown[] = [];
+    const failures: Error[] = [];
+    const client = new PetOverlayHostClient(script, {
+      onEvent: (event) => events.push(event),
+      onFailure: (error) => failures.push(error),
+      onLog: () => {},
+    });
+
+    await client.start(3000);
+    expect(fs.statSync(client.socketFilePath).mode & 0o777).toBe(0o600);
+    client.sendControl({
+      type: "init", protocol: 1, width: 400, height: 500, x: 10, y: 20, scale: 1,
+    });
+    await vi.waitFor(() => {
+      expect(events.some((event) => (event as { type?: string }).type === "pointer")).toBe(true);
+    });
+    client.stop();
+    expect(failures).toHaveLength(0);
+    expect(fs.existsSync(client.socketFilePath)).toBe(false);
+  });
+});
