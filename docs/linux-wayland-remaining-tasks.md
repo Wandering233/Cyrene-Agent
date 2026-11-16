@@ -3,7 +3,7 @@
 > 基线：`e42a45b4 feat(跨平台): 增加 Linux Wayland 原生桌宠 overlay`
 > 环境：Arch Linux + Hyprland 0.57.1 + Wayland，Electron 44.7.2
 > 说明：本文是**全量任务清单与逐项核对结果**；已完成项会随实现更新。
-> 最近更新：clickCount 单测；QA-04 失败路径；仅 Hyprland 范围；OVL-09 bottom layer；OVL-13；验收状态汇总；overlay soak；overlay 帧统计；Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
+> 最近更新：主题指针；clickCount 单测；QA-04 失败路径；仅 Hyprland 范围；OVL-09 bottom layer；OVL-13；验收状态汇总；overlay soak；overlay 帧统计；Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
 
 
 ## 验证范围（按用户指定）
@@ -56,7 +56,7 @@
 | OVL-16 | 🟡 | 丢帧/背压/延迟指标 | 新增 frames sent/dropped/restarts 统计与 10s 日志；实测 561/0/0 | 端到端延迟、队列深度 | P2 |
 | OVL-17 | ✅ | 滚轮/axis 输入 | 宿主转发 axis 增量；实测 uinput wheel → `mouseWheel` → 渲染页 `wheel`（±15） | 已验收 | P1 |
 | OVL-18 | 🟡 | 双击/右键/上下文菜单 | clickCount 抽成纯函数，单测覆盖双击/三击/按键/距离/超时复位；右键转发保留 | 真实右键菜单/长按实机 | P1 |
-| OVL-19 | ❌ | 鼠标指针形状 | 宿主未设置 cursor | 拖拽/缩放/可点击区域 cursor | P2 |
+| OVL-19 | 🟡 | 鼠标指针形状 | 宿主改用 `ThemedPointer`，enter 设 Pointer、leave 设 Default；`grim -c` 截图仍显示箭头，可能被合成器覆盖 | 真实指针形状验证 | P2 |
 | OVL-20 | ❌ | 触摸/触控笔 | 只处理 pointer | touch/stylus 适配 | P2 |
 | OVL-21 | ❌ | 键盘/IME（桌宠菜单） | `keyboard_interactivity=None`，无键盘转发 | 需要键盘时的独立模式或普通窗口 | P2 |
 | OVL-22 | ❌ | input region 精度/CPU | 4px 网格、每帧扫描 | 轮廓简化/增量更新/基准 | P2 |

@@ -28,7 +28,9 @@ use smithay_client_toolkit::{
     registry_handlers,
     seat::{
         Capability, SeatHandler, SeatState,
-        pointer::{PointerEvent, PointerEventKind, PointerHandler},
+        pointer::{
+            CursorIcon, PointerEvent, PointerEventKind, PointerHandler, ThemeSpec, ThemedPointer,
+        },
         relative_pointer::{RelativeMotionEvent, RelativePointerHandler, RelativePointerState},
     },
     shell::{
@@ -320,6 +322,7 @@ fn run(reader_stream: UnixStream, writer: EventWriter, initial_layer: Layer) -> 
         output_size: (0, 0),
         scale: 1,
         pointer: None,
+        themed_pointer: None,
         relative_pointer: None,
         drag: None,
         writer,
@@ -406,6 +409,7 @@ struct Overlay {
     output_size: (i32, i32),
     scale: i32,
     pointer: Option<wl_pointer::WlPointer>,
+    themed_pointer: Option<ThemedPointer>,
     relative_pointer: Option<ZwpRelativePointerV1>,
     drag: Option<DragState>,
     writer: EventWriter,
@@ -994,18 +998,20 @@ impl SeatHandler for Overlay {
         capability: Capability,
     ) {
         if capability == Capability::Pointer && self.pointer.is_none() {
-            match self.seat_state.get_pointer(qh, &seat) {
-                Ok(pointer) => {
-                    self.relative_pointer = self
-                        .relative_pointer_state
-                        .get_relative_pointer(&pointer, qh)
-                        .ok();
-                    if self.relative_pointer.is_none() {
-                        warn!("compositor does not support relative-pointer; drag will be limited");
-                    }
-                    self.pointer = Some(pointer);
-                }
-                Err(err) => warn!("failed to create pointer: {err}"),
+            let surface = self.compositor.create_surface(qh);
+            if let Ok(themed) = self.seat_state.get_pointer_with_theme(
+                qh,
+                &seat,
+                self.shm.wl_shm(),
+                surface,
+                ThemeSpec::default(),
+            ) {
+                self.pointer = Some(themed.pointer().clone());
+                self.themed_pointer = Some(themed);
+                self.relative_pointer = self
+                    .relative_pointer_state
+                    .get_relative_pointer(self.pointer.as_ref().unwrap(), qh)
+                    .ok();
             }
         }
     }
@@ -1021,6 +1027,7 @@ impl SeatHandler for Overlay {
             if let Some(pointer) = self.pointer.take() {
                 pointer.release();
             }
+            self.themed_pointer = None;
             self.relative_pointer = None;
         }
     }
