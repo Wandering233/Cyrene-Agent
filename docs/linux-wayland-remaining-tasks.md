@@ -76,7 +76,7 @@
 | TOAST-01 | ✅ | Toast 使用原生 overlay host | 真实主应用 `control toast-test` 触发：offscreen toast 页 → layer host，内容截图有 1229 色；普通 BrowserWindow 仍为 fallback | 已验收 | P0 |
 | TOAST-02 | ✅ | Toast 光标/角落定位 | 实测 layer 位于 [1798,1392,440,100]（右下角）；高度协议 28/58/100 正常 | 已验收 | P0 |
 | TOAST-03 | ✅ | Toast 穿透/点击 | 点击卡片中心后聊天窗口被激活（`昔涟 · 聊天（React）`）；host alpha input region + 指针转发生效 | 已验收 | P0 |
-| GS-01 | 🟡 | 直接接 GlobalShortcuts portal | 新增 portal 客户端；打包版 + desktop 文件实测 `hyprctl globalshortcuts` 出现 `cyrene:screenshot`；dev 无 app id 自动回退 | Activated 信号未在 uinput 合成键下触发；真实按键/KDE/GNOME 验证 | P0 |
+| GS-01 | 🟡 | 直接接 GlobalShortcuts portal | portal 注册/`hyprctl globalshortcuts` 出现 `cyrene:screenshot`；低层 Activated 参数已修正，`gdbus` 合成信号可触发监听 | 绑定 pending/真实按键未完成；KDE/GNOME 验证 | P0 |
 | GS-02 | ❌ | 授权/冲突/拒绝 | 无 | 首次授权、冲突提示、禁用状态 | P0 |
 | GS-03 | ❌ | 真实按键触发验证 | `register()` true，合成按键未触发 | 真实按键/portal 事件测试 | P0 |
 | GS-04 | ❌ | per-DE 兜底 | 无 | Hyprland dynamic bind、KDE、Sway、GNOME | P1 |
