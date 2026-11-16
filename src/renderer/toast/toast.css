@@ -161,3 +161,13 @@ body {
   color: var(--rb-text-default);
   background: var(--rb-active-light);
 }
+
+/* Accessibility: keep notifications usable when the user requests less motion. */
+@media (prefers-reduced-motion: reduce) {
+  .toast-card,
+  .toast-card * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

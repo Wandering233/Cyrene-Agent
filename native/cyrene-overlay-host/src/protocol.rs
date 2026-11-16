@@ -173,3 +173,35 @@ mod boundary_tests {
         assert!(serde_json::from_str::<Control>(r#"{"type":"size","width":0,"height":4}"#).is_ok());
     }
 }
+
+#[cfg(test)]
+mod fuzz_tests {
+    use super::*;
+
+    #[test]
+    fn arbitrary_json_never_panics() {
+        // Deterministic pseudo-random byte strings; parsing must return Err or
+        // a valid message, never panic.
+        let mut seed: u64 = 0x9e3779b97f4a7c15;
+        for _ in 0..2000 {
+            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            let len = (seed as usize % 96) + 1;
+            let mut bytes = vec![0u8; len];
+            for b in &mut bytes {
+                seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+                *b = (seed >> 33) as u8;
+            }
+            let text = String::from_utf8_lossy(&bytes);
+            let _ = serde_json::from_str::<Control>(&text);
+            let _ = serde_json::from_str::<FrameHeader>(&text);
+        }
+    }
+
+    #[test]
+    fn frame_headers_bound_dimensions() {
+        for (w, h, stride) in [(0u32, 1u32, 0u32), (1, 0, 4), (u32::MAX, 2, u32::MAX)] {
+            let header = FrameHeader { width: w, height: h, stride };
+            let _ = header.byte_len();
+        }
+    }
+}
