@@ -3,7 +3,7 @@
 > 基线：`e42a45b4 feat(跨平台): 增加 Linux Wayland 原生桌宠 overlay`
 > 环境：Arch Linux + Hyprland 0.57.1 + Wayland，Electron 44.7.2
 > 说明：本文是**全量任务清单与逐项核对结果**；已完成项会随实现更新。
-> 最近更新：协议 fuzz/reduced motion；宿主校验和；WIN-03 Hyprland 光标回退验收；主题指针；clickCount 单测；QA-04 失败路径；仅 Hyprland 范围；OVL-09 bottom layer；OVL-13；验收状态汇总；overlay soak；overlay 帧统计；Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
+> 最近更新：DE 矩阵文档验收；协议 fuzz/reduced motion；宿主校验和；WIN-03 Hyprland 光标回退验收；主题指针；clickCount 单测；QA-04 失败路径；仅 Hyprland 范围；OVL-09 bottom layer；OVL-13；验收状态汇总；overlay soak；overlay 帧统计；Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
 
 
 ## 验证范围（按用户指定）
@@ -128,7 +128,7 @@
 | WIN-06 | ❌ | 屏幕录制/desktopCapturer | 未验证；仅 Hyprland 范围 | 仅 Hyprland | P2 |
 | WIN-07 | ❌ | X11 回归 | 未跑 X11；按用户要求仅 Hyprland | 仅 Hyprland | P1 |
 | DOC-01 | ✅ | 安装/排障/升级文档 | 新增 `docs/linux-troubleshooting.md`：依赖、构建、doctor、控制通道、已知问题 | 已验收 | P1 |
-| DOC-02 | 🟡 | DE 支持矩阵 | 文档矩阵仅 Hyprland 实测，其他标注未跨 DE 验证 | 仅 Hyprland；跨 DE 不做 | P1 |
+| DOC-02 | ✅ | DE 支持矩阵 | 文档矩阵明确 Hyprland 实测、其他 DE 标“未跨 DE 验证”；范围与状态一致 | 已验收（文档） | P1 |
 | DOC-03 | ✅ | 诊断命令 | `cyrene doctor` 输出会话/桌面/依赖/宿主/截图目录；单测覆盖；实机输出正常 | 日志导出可后续 | P2 |
 
 ---
