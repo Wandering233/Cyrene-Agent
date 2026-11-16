@@ -31,3 +31,36 @@
 ## 结论
 
 这些项不是“代码未写”单一原因，多数需要新环境或 Electron/协议能力；在不再扩大范围前，不应虚标完成。
+
+## 剩余项矩阵（第 71 轮）
+
+| 项 | 状态 | 阻塞 |
+|---|---|---|
+| OVL-02 | 🟡 | subsurface 画面异常，已回滚 |
+| OVL-03 | ❌ | 仅 GNOME；跨 DE 不做 |
+| OVL-08 | ❌ | 跨输出拖拽未实现 |
+| OVL-10 | 🟡 | 只验证普通窗口 |
+| OVL-14 | ❌ | shared texture/DMA-BUF 未实现 |
+| OVL-19 | 🟡 | shape device 未生效 |
+| OVL-20 | 🟡 | 无真实触控硬件；uinput 未被识别 |
+| OVL-21 | ❌ | 键盘/IME 未实现 |
+| OVL-24 | ❌ | 无 arm64 Rust std |
+| OVL-26 | ❌ | 无旧 glibc 环境 |
+| OVL-27 | ❌ | 跨 DE 不做 |
+| SHOT-01 | 🟡 | 仅 Hyprland；portal 返回 2 |
+| SHOT-06 | 🟡 | 仅 Hyprland |
+| GS-02 | ❌ | 授权/冲突 UI 未做 |
+| FOCUS-01 | ❌ | Electron 无 xdg-activation token |
+| FOCUS-02 | ❌ | 后台激活 token/策略未做 |
+| FOCUS-04 | ❌ | 通知 action 未接 |
+| UPD-06 | ❌ | 回滚/旧版本保留未做 |
+| WIN-01 | ❌ | Lua move 可动，resize/setBounds 重排 |
+| WIN-02 | ❌ | 普通窗口置顶不可用 |
+| WIN-04 | ❌ | 透明/焦点未验证 |
+| WIN-05 | ❌ | 剪贴板/文件选择/拖放/密钥环未回归 |
+| WIN-06 | ❌ | 屏幕录制未验证 |
+| WIN-07 | ❌ | X11 不在范围 |
+| QA-02 | ❌ | 跨 DE 不做 |
+| TRAY-03 | ❌ | 跨 DE 不做 |
+
+其中 OVL-03/27、SHOT-01/06、QA-02、TRAY-03、WIN-07 属于跨 DE/X11，按当前范围不应继续投入。
