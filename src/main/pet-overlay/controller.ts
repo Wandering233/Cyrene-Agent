@@ -111,7 +111,7 @@ export class PetOverlayController {
     });
 
     this.window.setTitle("Cyrene Pet Overlay");
-    this.window.webContents.setFrameRate(60);
+    this.window.webContents.setFrameRate(this.visible ? 60 : 2);
     this.window.webContents.on("paint", (_event, _dirty, image) => this.handlePaint(image));
     this.window.webContents.on("console-message", (_event, _level, message) => {
       console.log("[PetOverlayRenderer]", message);
@@ -152,15 +152,22 @@ export class PetOverlayController {
     if (this.failed || this.disposed) return;
     this.visible = true;
     if (!this.window.isDestroyed()) {
+      // Hidden windows render at 2 fps; restore the interactive rate and send
+      // the latest frame before asking the compositor to show the surface.
+      this.window.webContents.setFrameRate(60);
       this.window.webContents.send(IPC.PET_VISIBILITY_CHANGED, true);
     }
-    if (this.hostReady) this.host?.sendControl({ type: "show" });
+    if (this.hostReady) {
+      this.host?.sendControl({ type: "show" });
+      this.flushLatestFrame();
+    }
   }
 
   hide(): void {
     if (this.failed || this.disposed) return;
     this.visible = false;
     if (!this.window.isDestroyed()) {
+      this.window.webContents.setFrameRate(2);
       this.window.webContents.send(IPC.PET_VISIBILITY_CHANGED, false);
     }
     if (this.hostReady) this.host?.sendControl({ type: "hide" });
@@ -353,7 +360,7 @@ export class PetOverlayController {
   private flushLatestFrame(): void {
     const frame = this.latest;
     const host = this.host;
-    if (!frame || !host || !this.hostReady) return;
+    if (!frame || !host || !this.hostReady || !this.visible) return;
     const sent = host.sendFrame(
       this.frameSeq++,
       frame.bitmap,
