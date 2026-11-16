@@ -3,7 +3,7 @@
 > 基线：`e42a45b4 feat(跨平台): 增加 Linux Wayland 原生桌宠 overlay`
 > 环境：Arch Linux + Hyprland 0.57.1 + Wayland，Electron 44.7.2
 > 说明：本文是**全量任务清单与逐项核对结果**；已完成项会随实现更新。
-> 最近更新：WIN-03 Hyprland 光标回退验收；主题指针；clickCount 单测；QA-04 失败路径；仅 Hyprland 范围；OVL-09 bottom layer；OVL-13；验收状态汇总；overlay soak；overlay 帧统计；Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
+> 最近更新：宿主校验和；WIN-03 Hyprland 光标回退验收；主题指针；clickCount 单测；QA-04 失败路径；仅 Hyprland 范围；OVL-09 bottom layer；OVL-13；验收状态汇总；overlay soak；overlay 帧统计；Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
 
 
 ## 验证范围（按用户指定）
@@ -62,7 +62,7 @@
 | OVL-22 | ❌ | input region 精度/CPU | 4px 网格、每帧扫描 | 轮廓简化/增量更新/基准 | P2 |
 | OVL-23 | 🟡 | 不可见时停止渲染 | 隐藏时帧率 60→2、不再向宿主发帧；show 时恢复 60 并补发最新帧 | 完全暂停 Live2D/锁屏遮挡通知 | P2 |
 | OVL-24 | ❌ | arm64/多架构 | 只构建当前 x64 | arm64 交叉构建/打包 | P1 |
-| OVL-25 | ❌ | CI 构建宿主/校验和 | 只有本地脚本 | GitHub Actions 安装 Rust、构建、校验 | P1 |
+| OVL-25 | 🟡 | CI 构建宿主/校验和 | 构建脚本生成 `SHA256SUMS`；CI native job 执行 `sha256sum -c`；尚未实跑远程 CI | 远程 CI 首跑 | P1 |
 | OVL-26 | ❌ | AppImage glibc/依赖兼容 | 本机 Arch 构建 | 旧发行版验证；libwayland 依赖声明 | P1 |
 | OVL-27 | ❌ | KDE/Sway/GNOME/多屏 E2E | 按用户要求不做跨 DE；仅 Hyprland 已验证 | 跨 DE 不验；仅 Hyprland | P0 |
 

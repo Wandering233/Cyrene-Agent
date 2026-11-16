@@ -35,6 +35,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo test --manifest-path native/cyrene-overlay-host/Cargo.toml
       - run: cargo build --release --manifest-path native/cyrene-overlay-host/Cargo.toml
+      - run: node scripts/build/overlay-host.mjs
       - run: |
           test -x native/cyrene-overlay-host/target/release/cyrene-overlay-host
           test -x native/cyrene-overlay-host/target/release/cyrene-overlay-fullscreen
+          cd resources/bin/linux && sha256sum -c SHA256SUMS

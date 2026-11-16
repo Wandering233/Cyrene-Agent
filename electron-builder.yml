@@ -92,6 +92,8 @@ linux:
       to: bin/cyrene-overlay-host
     - from: resources/bin/linux/cyrene-overlay-fullscreen
       to: bin/cyrene-overlay-fullscreen
+    - from: resources/bin/linux/SHA256SUMS
+      to: bin/SHA256SUMS
   category: Utility
   synopsis: Live2D desktop AI companion
   description: Cyrene is a Live2D desktop AI companion built with Electron and TypeScript.
