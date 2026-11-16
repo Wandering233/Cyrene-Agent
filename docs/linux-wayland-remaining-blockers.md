@@ -24,6 +24,7 @@
 - OVL-02：fullscreen parent+child subsurface 两次尝试画面位置/缩放异常，已回滚；保持全屏 buffer。
 - OVL-08：跨输出拖拽需要 host 输出邻接/坐标迁移，未实现。
 - OVL-14：shared texture 零拷贝需要 native texture 处理，未评估完成。
+- OVL-19：Hyprland 提供 `wp_cursor_shape_manager_v1`，但 `get_pointer_with_theme` 在当前主题下未产出可用的 shape device；`grim -c` 仍显示默认箭头，未验收。
 - OVL-21：键盘/IME 需要独立交互模式，未实现。
 - WIN-04/05/06/07：透明/焦点/剪贴板/文件选择/录制/X11 回归未系统验证。
 
