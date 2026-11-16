@@ -2,6 +2,7 @@ import { app, BrowserWindow, type NativeImage } from "electron";
 import path from "node:path";
 import { IPC } from "../../shared/ipc-channels";
 import { PetOverlayHostClient } from "./host-client";
+import { resolvePointerClickCount, type PointerClickState } from "./click-count";
 import {
   PROTOCOL_VERSION,
   frameStride,
@@ -67,13 +68,7 @@ export class PetOverlayController {
   private failed = false;
   private disposed = false;
   private latest: LatestFrame | null = null;
-  private lastPointerClick: {
-    button: "left" | "middle" | "right";
-    at: number;
-    x: number;
-    y: number;
-    count: number;
-  } | null = null;
+  private lastPointerClick: PointerClickState | null = null;
   private frameSeq = 0;
   private framesSent = 0;
   private framesDropped = 0;
@@ -486,16 +481,9 @@ export class PetOverlayController {
     x: number,
     y: number,
   ): number {
-    const now = Date.now();
-    const previous = this.lastPointerClick;
-    const near = previous
-      && previous.button === button
-      && now - previous.at <= 400
-      && Math.abs(previous.x - x) <= 4
-      && Math.abs(previous.y - y) <= 4;
-    const count = near ? Math.min(3, previous!.count + 1) : 1;
-    this.lastPointerClick = { button, at: now, x, y, count };
-    return count;
+    const result = resolvePointerClickCount(this.lastPointerClick, button, x, y, Date.now());
+    this.lastPointerClick = result.state;
+    return result.count;
   }
 
   private handleDrag(event: DragEvent): void {
