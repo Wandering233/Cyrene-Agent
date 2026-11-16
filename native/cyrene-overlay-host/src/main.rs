@@ -695,7 +695,11 @@ impl Overlay {
                 header.height,
                 header.stride as usize,
                 INPUT_ALPHA_THRESHOLD,
-                INPUT_REGION_CELL * scale as u32,
+                (if self.width.saturating_mul(self.height) > 300_000 {
+                    6
+                } else {
+                    INPUT_REGION_CELL
+                }) * scale as u32,
             )
             .into_iter()
             .map(|rect| Rect {

@@ -205,3 +205,29 @@ mod tests {
         assert!(alpha_rects(&pixels, 8, 8, 32, 10, 4).is_empty());
     }
 }
+
+#[cfg(test)]
+mod budget_tests {
+    use super::*;
+    use std::time::Instant;
+
+    #[test]
+    fn large_frame_region_computation_stays_bounded() {
+        let (w, h) = (600u32, 750u32);
+        let stride = w as usize * 4;
+        let mut pixels = vec![0u8; stride * h as usize];
+        for y in 0..h {
+            for x in 0..w {
+                pixels[y as usize * stride + x as usize * 4 + 3] = 255;
+            }
+        }
+        let start = Instant::now();
+        let rects = alpha_rects(&pixels, w, h, stride, 10, 6);
+        let elapsed = start.elapsed();
+        assert_eq!(rects.len(), 1);
+        assert!(
+            elapsed.as_millis() < 50,
+            "region computation took {elapsed:?}"
+        );
+    }
+}
