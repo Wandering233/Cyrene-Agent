@@ -11,6 +11,9 @@ asarUnpack:
   # Transformers.js 会静态加载 sharp；连同 libvips 依赖 DLL 一起解包，确保原生扩展能找到依赖。
   - "**/node_modules/sharp/**"
   - "**/vendor/srt-win/**"
+  # Linux seccomp helper is spawned as a real executable; asar paths are not
+  # executable files for bubblewrap/seccomp.
+  - "**/node_modules/@anthropic-ai/sandbox-runtime/vendor/seccomp/**"
   - "**/node_modules/@ast-grep/**"
   # Playwright MCP 以 ELECTRON_RUN_AS_NODE 模式运行，读不了 asar 虚拟路径，
   # 需真实磁盘文件（cli.js + 其依赖的 playwright / playwright-core）

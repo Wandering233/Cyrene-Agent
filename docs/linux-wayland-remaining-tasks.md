@@ -105,13 +105,13 @@
 | UPD-04 | ❌ | 更新签名/校验 | 无 Linux 签名 | minisign/GPG 或 sha512 + 文档 | P1 |
 | UPD-05 | ❌ | Electron/宿主原子更新 | 宿主随包更新，无版本校验 | 协议版本/宿主版本绑定 | P1 |
 | UPD-06 | ❌ | 回滚/旧版本保留 | 无 | 失败回滚、保留上一版 | P2 |
-| SBX-01 | 🟡 | SRT Linux 初始化 | 已加载 SRT、调用 `checkDependenciesAsync`；本机因 socat 缺失保持 fail-closed | 安装 socat 后实机初始化/bwrap | P0 |
-| SBX-02 | 🟡 | bwrap/socat/rg 依赖 | 启动检查并报告 `socat not installed`；bwrap/rg 已有 | 安装文档/打包；socat 实机 | P0 |
-| SBX-03 | ❌ | seccomp 二进制 asarUnpack | 只有 Windows vendor | 解包/路径/执行验证 | P1 |
-| SBX-04 | 🟡 | 档位映射 | `buildSandboxConfig` 在 Linux 省略 windows 块；档位文件系统逻辑复用；单测成功路径 | 实机 bwrap 档位验证 | P0 |
+| SBX-01 | ✅ | SRT Linux 初始化 | 补齐 socat 后实机 `SandboxManager.initialize` + `wrapWithSandboxArgv`，bwrap 执行 `echo sandbox-ok` 成功 | 已验收 | P0 |
+| SBX-02 | ✅ | bwrap/socat/rg 依赖 | `checkDependenciesAsync` 检查三者；实机 socat 1.8.1.3 + bwrap/rg 通过；排障文档给出安装命令 | 已验收 | P0 |
+| SBX-03 | ✅ | seccomp 二进制 asarUnpack | electron-builder asarUnpack 增加 `@anthropic-ai/sandbox-runtime/vendor/seccomp/**`；打包目录验证解包路径 | 已验收 | P1 |
+| SBX-04 | ✅ | 档位映射 | Linux config 省略 windows；实机 read/write allowWrite 档位 bwrap 执行成功；Linux 单测覆盖 | 已验收 | P0 |
 | SBX-05 | ❌ | 网络 allowlist/DNS/代理 | 无 Linux 网络沙箱 | socat 桥、域名白名单 | P1 |
 | SBX-06 | ❌ | AppArmor/userns 检测 | 无 | Ubuntu 24.04 检测与提示 | P1 |
-| SBX-07 | 🟡 | fail-closed 错误/测试 | 缺依赖时 `isSandboxReady=false`，wrap 返回 not_ready；单测覆盖 | 错误码映射/真实命令集成 | P1 |
+| SBX-07 | ✅ | fail-closed 错误/测试 | 缺 socat 时 not_ready；补齐依赖后真实 bwrap 命令成功；单测覆盖两条路径 | 已验收 | P1 |
 | SBX-08 | ❌ | GUI 命令 Wayland socket | 无 | bwrap 绑定 `XDG_RUNTIME_DIR/wayland-*` | P2 |
 | WIN-01 | ❌ | 普通窗口定位/居中/恢复 | `toast-window.ts` 用 `setBounds`；Wayland 无效 | 宿主化或接受合成器放置 | P1 |
 | WIN-02 | ❌ | 普通窗口置顶 | `setAlwaysOnTop` 原生 Wayland 无效 | 仅桌宠有方案；普通窗口需 layer-shell/扩展 | P1 |
