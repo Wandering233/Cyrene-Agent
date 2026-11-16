@@ -1,3 +1,6 @@
+import { installPetContextMenu } from "./pet-context-menu";
+
+if (window.cyrene?.petOverlayMode) installPetContextMenu();
 import { Live2DManager } from "./live2d/manager";
 import "./ui/theme";
 import { InteractionController } from "./live2d/interaction";
