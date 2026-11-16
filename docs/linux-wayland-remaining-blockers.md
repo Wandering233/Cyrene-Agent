@@ -7,14 +7,15 @@
 
 - 没有 GNOME/Mutter、KDE、Sway 实机：OVL-03/27、SHOT-01/06、QA-02、TRAY-03 只能保持未跨 DE。
 - 没有真实 125/150 分数缩放以外的输出：1.25 已验证；1.5 可用同一 ceil 逻辑，但未单独实机。
-- 没有真实触摸屏/触控笔：OVL-20 代码已接，无法验收硬件事件。
+- 没有真实触摸屏/触控笔：OVL-20 代码已接；uinput 虚拟触摸屏未被 Hyprland 识别为 touch 设备，无法自动验收。
 - 没有旧发行版/glibc 环境：OVL-26 不能验证兼容性。
 - 没有 arm64 工具链 std：OVL-24 交叉构建不可用。
 
 ## Electron/合成器限制
 
 - Native Wayland 下 Electron `setBounds`/`setAlwaysOnTop` 对普通窗口无效。  
-  Hyprland Lua `window.move({relative=true})` 可移动到目标位置，但 `window.resize` 会重排/居中，Electron 随后的 setBounds 又会把窗口重新铺回 tiled；WIN-01 未完成。
+  Hyprland Lua `window.move({relative=true})` 可移动到目标位置；但 `window.resize` 会重排/居中，Electron 随后的 setBounds 又铺回 tiled；WIN-01 未完成。
+- uinput 虚拟触摸屏未被 Hyprland 识别为 touch 设备，OVL-20 只能在真实触控硬件上验收。
 - xdg-activation token 未暴露给 Electron：FOCUS-01/02 未完成。
 - 系统通知 action 未接入：FOCUS-04 未完成。
 
