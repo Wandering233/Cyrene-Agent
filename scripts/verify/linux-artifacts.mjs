@@ -4,7 +4,8 @@
  * Fails fast when the AppImage, update metadata, or native overlay hosts are
  * missing; this is the check we run before uploading release assets.
  */
-import { access, readFile, stat } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 
 const releaseDir = path.resolve(process.argv[2] ?? "release");
@@ -29,6 +30,7 @@ await checkFile(appImage, true);
 await checkFile("latest-linux.yml");
 await checkFile("linux-unpacked/resources/bin/cyrene-overlay-host", true);
 await checkFile("linux-unpacked/resources/bin/cyrene-overlay-fullscreen", true);
+await checkFile("linux-unpacked/resources/bin/SHA256SUMS");
 
 try {
   const update = await readFile(path.join(releaseDir, "latest-linux.yml"), "utf8");
@@ -37,6 +39,19 @@ try {
   if (!/^sha512:/m.test(update)) errors.push("latest-linux.yml: missing sha512");
 } catch (error) {
   errors.push(`latest-linux.yml: ${error.message}`);
+}
+
+try {
+  const sums = await readFile(path.join(releaseDir, "linux-unpacked/resources/bin/SHA256SUMS"), "utf8");
+  for (const line of sums.split("\n")) {
+    const match = /^([a-f0-9]{64})\s+(.+)$/.exec(line.trim());
+    if (!match) continue;
+    const data = await readFile(path.join(releaseDir, "linux-unpacked/resources/bin", match[2]));
+    const digest = createHash("sha256").update(data).digest("hex");
+    if (digest !== match[1]) errors.push(`SHA256SUMS mismatch: ${match[2]}`);
+  }
+} catch (error) {
+  errors.push(`SHA256SUMS: ${error.message}`);
 }
 
 if (errors.length > 0) {
