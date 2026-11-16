@@ -64,6 +64,10 @@ cyrene doctor
 - 网络沙箱 SBX-05 按用户要求未处理；跨 DE 项未验证。
 - 未完成不等于失败：代码路径和验证证据已按项记录。
 
+## 剩余阻塞
+
+详见 [linux-wayland-remaining-blockers.md](linux-wayland-remaining-blockers.md)。
+
 ## 结论
 
 该分支已经具备在 Hyprland/AppImage 上可用的 Linux 无 X11 桌宠、截图、标注、热键、Toast、自启动和沙箱基础路径；但清单中跨合成器、网络沙箱、分数缩放、完整打包升级与性能/CI 项目仍未验收，不能宣称 86 项全部完成。
