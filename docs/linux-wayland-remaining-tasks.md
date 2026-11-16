@@ -3,7 +3,7 @@
 > 基线：`e42a45b4 feat(跨平台): 增加 Linux Wayland 原生桌宠 overlay`
 > 环境：Arch Linux + Hyprland 0.57.1 + Wayland，Electron 44.7.2
 > 说明：本文是**全量任务清单与逐项核对结果**；已完成项会随实现更新。
-> 最近更新：overlay 帧统计；Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
+> 最近更新：overlay soak；overlay 帧统计；Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
 
 ## 状态图例
 
@@ -132,7 +132,7 @@
 |---|---|---|---|---|---|
 | QA-01 | 🟡 | 宿主集成测试 | 新增 `host-client.test.ts` 假宿主：ready/init/pointer/cleanup；Rust 单测保留 | 假 compositor、输入区域断言 | P0 |
 | QA-02 | ❌ | 合成器 E2E 矩阵 | 只测 Hyprland | KDE/Sway/GNOME/多屏/4K | P0 |
-| QA-03 | ❌ | 性能/内存/句柄泄漏 | 只测 59fps | 长跑、CPU、RSS、fd、延迟 | P1 |
+| QA-03 | 🟡 | 性能/内存/句柄泄漏 | 新增 `verify:linux-overlay-soak`：12s 实测 RSS 392→418MB（+6.8%）、fd 156→155；非长跑 | 长跑/CPU/延迟/4K | P1 |
 | QA-04 | 🟡 | 失败路径 | 新增宿主协议错、启动超时测试；启动/停止/0600 已覆盖 | socket 拒绝/崩溃恢复端到端 | P1 |
 | QA-05 | 🟡 | 协议 fuzz/边界 | Rust 边界测试覆盖 stride 溢出/零 stride；Jet 边界畸形帧仍待补 | 畸形帧/半包/乱序 fuzz | P2 |
 | QA-06 | 🟡 | 打包产物测试 | AppImage 实机 + autostart 验证；`verify:linux-artifacts` 检查 AppImage/latest-linux.yml/两个宿主 | 多架构、真实升级 | P1 |
