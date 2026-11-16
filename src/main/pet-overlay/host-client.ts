@@ -48,7 +48,7 @@ export class PetOverlayHostClient {
   ) {
     this.socketPath = path.join(
       os.tmpdir(),
-      `cyrene-overlay-${process.pid}-${Date.now().toString(36)}.sock`,
+      `cyrene-overlay-${process.pid}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.sock`,
     );
     this.callbacks = callbacks;
   }

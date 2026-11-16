@@ -52,6 +52,9 @@ describe("PetOverlayHostClient", () => {
       onLog: () => {},
     });
 
+    // A stale socket from a crashed previous process must be removed before
+    // server.listen(); otherwise start() would fail with EADDRINUSE.
+    fs.writeFileSync(client.socketFilePath, "stale");
     await client.start(3000);
     expect(fs.statSync(client.socketFilePath).mode & 0o777).toBe(0o600);
     client.sendControl({
@@ -63,6 +66,16 @@ describe("PetOverlayHostClient", () => {
     client.stop();
     expect(failures).toHaveLength(0);
     expect(fs.existsSync(client.socketFilePath)).toBe(false);
+  });
+});
+
+describe("PetOverlayHostClient multi-instance", () => {
+  it("allocates a unique socket path per client", () => {
+    const callbacks = { onEvent: () => {}, onFailure: () => {}, onLog: () => {} };
+    const first = new PetOverlayHostClient(makeFakeHost(), callbacks);
+    const second = new PetOverlayHostClient(makeFakeHost(), callbacks);
+    expect(first.socketFilePath).not.toBe(second.socketFilePath);
+    expect(first.socketFilePath).toContain(`cyrene-overlay-${process.pid}-`);
   });
 });
 
