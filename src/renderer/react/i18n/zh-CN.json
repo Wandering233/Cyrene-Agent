@@ -1595,6 +1595,8 @@
     "petVisibleDescription": "在桌面上显示或隐藏桌面伙伴。",
     "petZoom": "桌面伙伴大小",
     "petZoomDescription": "调整桌面伙伴的显示比例。",
+    "screenshotHotkey": "截图快捷键",
+    "screenshotHotkeyDescription": "例如 Alt+Shift+S；修改后自动重新注册。",
     "loadFailed": "设置读取失败，部分选项可能无法显示。",
     "autoApply": "设置会自动应用",
     "general": {

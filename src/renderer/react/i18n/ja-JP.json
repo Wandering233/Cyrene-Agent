@@ -1619,6 +1619,8 @@
     "petVisibleDescription": "デスクトップコンパニオンをデスクトップ上で表示／非表示にします。",
     "petZoom": "デスクトップコンパニオンのサイズ",
     "petZoomDescription": "デスクトップコンパニオンの表示倍率を調整します。",
+    "screenshotHotkey": "スクリーンショットショートカット",
+    "screenshotHotkeyDescription": "例: Alt+Shift+S。変更後すぐに再登録します。",
     "loadFailed": "設定の読み込みに失敗しました。一部の項目が表示されない可能性があります。",
     "autoApply": "設定は自動的に適用されます",
     "general": {

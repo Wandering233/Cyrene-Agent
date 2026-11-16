@@ -52,6 +52,7 @@ interface AppearanceValues {
   petAlwaysOnTop: boolean;
   petVisible: boolean;
   petZoom: number;
+  screenshotHotkey: string;
 }
 
 const defaults: AppearanceValues = {
@@ -60,6 +61,7 @@ const defaults: AppearanceValues = {
   petAlwaysOnTop: false,
   petVisible: true,
   petZoom: 1,
+  screenshotHotkey: "Alt+Shift+S",
 };
 
 function objectValue(value: unknown): Record<string, unknown> {
@@ -78,6 +80,9 @@ function readAppearance(value: unknown): AppearanceValues {
     petAlwaysOnTop: typeof input.petAlwaysOnTop === "boolean" ? input.petAlwaysOnTop : defaults.petAlwaysOnTop,
     petVisible: typeof input.petVisible === "boolean" ? input.petVisible : defaults.petVisible,
     petZoom: finiteNumber(input.petZoom, defaults.petZoom),
+    screenshotHotkey: typeof input.screenshotHotkey === "string"
+      ? input.screenshotHotkey
+      : defaults.screenshotHotkey,
   };
 }
 
@@ -406,6 +411,16 @@ export function AppearanceSettingsPage({ section, onSelectSection, onBackToWorks
                       <SettingsSlider min={0.5} max={2} step={0.1} value={values.petZoom} ariaLabel={t("settingsPage.petZoom")} onChange={(value) => updateNumber("petZoom", value)} onChangeComplete={(zoom) => { window.settings?.setPetZoom(zoom); setStatus(t("settingsPage.applied")); }} />
                       <span>{Math.round(values.petZoom * 100)}%</span>
                     </div>
+                  </div>
+                  <div className="cy-settings-row">
+                    <div className="cy-settings-row__copy"><strong data-settings-search-id="settingsPage.screenshotHotkey">{t("settingsPage.screenshotHotkey")}</strong><span>{t("settingsPage.screenshotHotkeyDescription")}</span></div>
+                    <input
+                      className="cy-settings-hotkey-input"
+                      aria-label={t("settingsPage.screenshotHotkey")}
+                      value={values.screenshotHotkey}
+                      onChange={(event) => setValues((current) => ({ ...current, screenshotHotkey: event.target.value }))}
+                      onBlur={() => { void savePatch({ screenshotHotkey: values.screenshotHotkey.trim() || defaults.screenshotHotkey }); }}
+                    />
                   </div>
                 </Card>
               </section>
