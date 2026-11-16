@@ -72,6 +72,9 @@ export class PetOverlayController {
   private frameSeq = 0;
   private framesSent = 0;
   private framesDropped = 0;
+  private lastSentSeq = -1;
+  private lastSentAt = 0;
+  private lastLatencyMs: number | null = null;
   private lastStatsAt = Date.now();
   private readyEmitted = false;
   private pageLoaded = false;
@@ -371,6 +374,8 @@ export class PetOverlayController {
     );
     if (sent) {
       this.framesSent += 1;
+      this.lastSentSeq = this.frameSeq - 1;
+      this.lastSentAt = Date.now();
       this.latest = null;
     } else {
       this.framesDropped += 1;
@@ -378,7 +383,7 @@ export class PetOverlayController {
     if (Date.now() - this.lastStatsAt >= 10_000) {
       this.lastStatsAt = Date.now();
       console.info(
-        `[PetOverlay] frames sent=${this.framesSent} dropped=${this.framesDropped} restarts=${this.restartAttempts}`,
+        `[PetOverlay] frames sent=${this.framesSent} dropped=${this.framesDropped} restarts=${this.restartAttempts} latency=${this.lastLatencyMs ?? "?"}ms`,
       );
     }
   }
@@ -396,6 +401,12 @@ export class PetOverlayController {
 
   private handleHostEvent(event: HostEvent): void {
     switch (event.type) {
+      case "frame_ack": {
+        if (event.seq === this.lastSentSeq && this.lastSentAt > 0) {
+          this.lastLatencyMs = Date.now() - this.lastSentAt;
+        }
+        break;
+      }
       case "ready":
         if (event.protocol !== PROTOCOL_VERSION) {
           this.fail(new Error(

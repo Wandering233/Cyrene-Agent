@@ -131,6 +131,7 @@ export interface LogEvent {
 
 export type HostEvent =
   | ReadyEvent
+  | { type: "frame_ack"; seq: number }
   | PointerEvent
   | DragEvent
   | PositionEvent

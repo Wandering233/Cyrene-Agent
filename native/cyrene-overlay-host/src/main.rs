@@ -329,6 +329,8 @@ fn run(reader_stream: UnixStream, writer: EventWriter, initial_layer: Layer) -> 
         signal,
         quit: false,
         ready_sent: false,
+        last_frame_seq: None,
+        acked_seq: None,
     };
 
     {
@@ -416,6 +418,8 @@ struct Overlay {
     signal: LoopSignal,
     quit: bool,
     ready_sent: bool,
+    last_frame_seq: Option<u64>,
+    acked_seq: Option<u64>,
 }
 
 impl Overlay {
@@ -583,6 +587,7 @@ impl Overlay {
     }
 
     fn handle_frame(&mut self, header: FrameHeader, pixels: Vec<u8>) {
+        self.last_frame_seq = Some(header.seq);
         if header.width == 0 || header.height == 0 {
             return;
         }
@@ -655,6 +660,8 @@ impl Overlay {
 
         if !attached {
             debug!("all shm buffers are busy; dropping a frame");
+        } else {
+            self.ack_frame();
         }
     }
 
@@ -711,6 +718,15 @@ impl Overlay {
 
     fn apply_margins(&self) {
         self.layer.set_margin(self.y, 0, 0, self.x);
+    }
+
+    fn ack_frame(&mut self) {
+        if let Some(seq) = self.last_frame_seq {
+            if self.acked_seq != Some(seq) {
+                self.acked_seq = Some(seq);
+                self.writer.send(&HostEvent::FrameAck { seq });
+            }
+        }
     }
 
     fn clamp_position(&mut self) {

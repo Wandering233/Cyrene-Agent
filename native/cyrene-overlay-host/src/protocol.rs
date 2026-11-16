@@ -41,6 +41,8 @@ pub enum Control {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct FrameHeader {
+    #[serde(default)]
+    pub seq: u64,
     pub width: u32,
     pub height: u32,
     pub stride: u32,
@@ -61,6 +63,9 @@ impl FrameHeader {
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum HostEvent {
+    FrameAck {
+        seq: u64,
+    },
     Ready {
         protocol: u32,
         width: u32,
@@ -159,6 +164,7 @@ mod boundary_tests {
     #[test]
     fn rejects_frame_headers_with_overflowing_stride() {
         let header = FrameHeader {
+            seq: 0,
             width: u32::MAX,
             height: u32::MAX,
             stride: u32::MAX,
@@ -168,7 +174,7 @@ mod boundary_tests {
 
     #[test]
     fn rejects_zero_or_short_headers() {
-        let header = FrameHeader { width: 4, height: 2, stride: 0 };
+        let header = FrameHeader { seq: 0, width: 4, height: 2, stride: 0 };
         assert!(header.byte_len().is_none());
         assert!(serde_json::from_str::<Control>(r#"{"type":"size","width":0,"height":4}"#).is_ok());
     }
@@ -200,7 +206,7 @@ mod fuzz_tests {
     #[test]
     fn frame_headers_bound_dimensions() {
         for (w, h, stride) in [(0u32, 1u32, 0u32), (1, 0, 4), (u32::MAX, 2, u32::MAX)] {
-            let header = FrameHeader { width: w, height: h, stride };
+            let header = FrameHeader { seq: 0, width: w, height: h, stride };
             let _ = header.byte_len();
         }
     }
