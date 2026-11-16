@@ -385,12 +385,22 @@ describe("Linux annotation flow", () => {
   });
 
   it("does not insert when the annotation editor is cancelled", async () => {
-    const { service, sendInsert } = serviceWith(async () => null);
+    const cleanupFile = vi.fn();
+    const client = { start: vi.fn(), ensureStarted: vi.fn(), shutdown: vi.fn() } as unknown as ScreenshotHelperClient;
+    const sendInsert = vi.fn();
+    const service = createScreenshotService({
+      client, sendInsert,
+      capture: vi.fn(async () => ({ filePath: "/tmp/cyrene-test-screenshots/raw.png", width: 400, height: 500 })),
+      annotate: async () => null,
+      cleanupFile,
+      registerShortcut: () => true, unregisterShortcut: () => {}, isAvailable: () => true,
+    });
     await expect(service.startFromChatButton()).resolves.toEqual({
       ok: false,
       reason: "SCREENSHOT_CANCELLED",
     });
     expect(sendInsert).not.toHaveBeenCalled();
+    expect(cleanupFile).toHaveBeenCalledWith("/tmp/cyrene-test-screenshots/raw.png");
   });
 });
 

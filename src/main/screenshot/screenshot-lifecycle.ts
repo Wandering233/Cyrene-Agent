@@ -155,6 +155,9 @@ export function initializeScreenshotService(
     annotate: useLinuxCapture
       ? (filePath) => annotateScreenshot(filePath, getReactChatWindow())
       : undefined,
+    cleanupFile: (filePath) => {
+      try { fs.rmSync(filePath, { force: true }); } catch { /* ignore */ }
+    },
     copyToClipboard: (filePath) => {
       try {
         const png = fs.readFileSync(filePath);

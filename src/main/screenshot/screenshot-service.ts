@@ -30,6 +30,7 @@ export interface ScreenshotServiceDeps {
   copyToClipboard?(filePath: string): void;
   /** Optional annotation editor; return null when the user cancels. */
   annotate?(filePath: string): Promise<string | null>;
+  cleanupFile?(filePath: string): void;
   registerShortcut(accelerator: string, callback: () => void): boolean;
   unregisterShortcut(accelerator: string): void;
   /** 原生 helper 是否可用；缺省视为可用（保持既有行为）。 */
@@ -117,7 +118,10 @@ export function createScreenshotService(deps: ScreenshotServiceDeps): Screenshot
         let hasAnnotations = false;
         if (deps.annotate) {
           const annotated = await deps.annotate(filePath);
-          if (!annotated) return { ok: false, reason: "SCREENSHOT_CANCELLED" };
+          if (!annotated) {
+            deps.cleanupFile?.(filePath);
+            return { ok: false, reason: "SCREENSHOT_CANCELLED" };
+          }
           filePath = annotated;
           hasAnnotations = true;
         }
