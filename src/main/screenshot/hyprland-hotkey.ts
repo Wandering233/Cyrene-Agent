@@ -41,6 +41,7 @@ export function installHyprlandScreenshotHotkey(
 ): HyprlandHotkeyBinding | null {
   const env = options.env ?? process.env;
   if (!env.HYPRLAND_INSTANCE_SIGNATURE) return null;
+  if (env.CYRENE_HYPRLAND_HOTKEY === "0") return null;
   const binding = toHyprlandBind(accelerator);
   if (!binding) return null;
 

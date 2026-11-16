@@ -138,7 +138,9 @@ export class GlobalShortcutsPortal {
   private readonly onMessage = (message: any): void => {
     if (message.type !== this.dbus?.MessageType.SIGNAL) return;
     if (message.interface === SHORTCUTS_INTERFACE && message.member === "Activated") {
-      const [, shortcutId, timestamp] = message.body as [string, string, number];
+      const body = message.body as [string, string, number, unknown];
+      const args = (Array.isArray(body[0]) ? body[0] : body) as unknown as [string, string, number];
+      const [, shortcutId, timestamp] = args;
       console.info("[GlobalShortcuts] activated", shortcutId);
       for (const listener of this.listeners) listener({ shortcutId, timestamp });
       return;
