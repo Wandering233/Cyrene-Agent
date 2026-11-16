@@ -3,7 +3,7 @@
 > 基线：`e42a45b4 feat(跨平台): 增加 Linux Wayland 原生桌宠 overlay`
 > 环境：Arch Linux + Hyprland 0.57.1 + Wayland，Electron 44.7.2
 > 说明：本文是**全量任务清单与逐项核对结果**；已完成项会随实现更新。
-> 最近更新：4K120/600x750 验收；Toast 高对比度；QA-03 60s 验收；soak CPU/fd 采样；Wayland touch 转发；4K 输出性能采样；60s soak/隐藏渲染验收；Toast 键盘可达性；OVL-16 延迟指标；QA-01 宿主集成测试验收；协议校验脚本；UPD-01 本地 feed 验收；OVL-12 协议不匹配 e2e；SHOT-02 窗口截图验收；窗口截图目标；GS-01/GS-04 验收；SHOT-05 多屏截图验收；slurp 选区修复；打包校验和校验；DE 矩阵文档验收；协议 fuzz/reduced motion；宿主校验和；WIN-03 Hyprland 光标回退验收；主题指针；clickCount 单测；QA-04 失败路径；仅 Hyprland 范围；OVL-09 bottom layer；OVL-13；验收状态汇总；overlay soak；overlay 帧统计；Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
+> 最近更新：GS-03 按键触发验收；4K120/600x750 验收；Toast 高对比度；QA-03 60s 验收；soak CPU/fd 采样；Wayland touch 转发；4K 输出性能采样；60s soak/隐藏渲染验收；Toast 键盘可达性；OVL-16 延迟指标；QA-01 宿主集成测试验收；协议校验脚本；UPD-01 本地 feed 验收；OVL-12 协议不匹配 e2e；SHOT-02 窗口截图验收；窗口截图目标；GS-01/GS-04 验收；SHOT-05 多屏截图验收；slurp 选区修复；打包校验和校验；DE 矩阵文档验收；协议 fuzz/reduced motion；宿主校验和；WIN-03 Hyprland 光标回退验收；主题指针；clickCount 单测；QA-04 失败路径；仅 Hyprland 范围；OVL-09 bottom layer；OVL-13；验收状态汇总；overlay soak；overlay 帧统计；Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
 
 
 ## 验证范围（按用户指定）
@@ -85,7 +85,7 @@
 | TOAST-03 | ✅ | Toast 穿透/点击 | 点击卡片中心后聊天窗口被激活（`昔涟 · 聊天（React）`）；host alpha input region + 指针转发生效 | 已验收 | P0 |
 | GS-01 | ✅ | 直接接 GlobalShortcuts portal | 打包版+desktop 文件：portal 注册成功；合成 Activated 触发后 `startFromHotkey` 生成截图 PNG；仅 Hyprland | 已验收（合成 Activated） | P0 |
 | GS-02 | ❌ | 授权/冲突/拒绝 | 无 | 首次授权、冲突提示、禁用状态 | P0 |
-| GS-03 | ❌ | 真实按键触发验证 | `register()` true，合成按键未触发 | 真实按键/portal 事件测试 | P0 |
+| GS-03 | ✅ | 真实按键触发验证 | Hyprland `hl.bind` + uinput Alt+Shift+S 生成截图；portal 合成 Activated 也生成截图；真实物理键盘未人工按压 | 已验收（Hyprland） | P0 |
 | GS-04 | ✅ | per-DE 兜底 | Hyprland `hl.bind` 实机按键生成截图；其他 DE 按用户要求不验证 | 已验收（仅 Hyprland） | P1 |
 | GS-05 | ❌ | 快捷键设置 UI/持久化 | 只有截图 accelerator 注册 | 录制快捷键、冲突检测、保存 | P1 |
 | TRAY-01 | ✅ | StatusNotifier 宿主检测 | 新增 `tray/tray-host.ts`，启动用 gdbus `NameHasOwner` 探测；单测覆盖；本机 quickshell 返回 true | 无宿主实机验证降级日志 | P0 |
