@@ -3,7 +3,7 @@
 > 基线：`e42a45b4 feat(跨平台): 增加 Linux Wayland 原生桌宠 overlay`
 > 环境：Arch Linux + Hyprland 0.57.1 + Wayland，Electron 44.7.2
 > 说明：本文是**全量任务清单与逐项核对结果**；已完成项会随实现更新。
-> 最近更新：XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
+> 最近更新：GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
 
 ## 状态图例
 
@@ -76,7 +76,7 @@
 | TOAST-01 | ❌ | Toast 使用原生 overlay host | `toast-window.ts` 仍是普通 BrowserWindow | 复用 offscreen + host | P0 |
 | TOAST-02 | ❌ | Toast 光标/角落定位 | `setBounds` 在原生 Wayland 无效；光标 0,0 | 宿主定位或系统通知 | P0 |
 | TOAST-03 | ❌ | Toast 穿透/点击 | 普通窗口整窗可交互 | input region | P0 |
-| GS-01 | ❌ | 直接接 GlobalShortcuts portal | `src/` 无 `GlobalShortcuts` | CreateSession/BindShortcuts/Activated | P0 |
+| GS-01 | 🟡 | 直接接 GlobalShortcuts portal | 新增 portal 客户端；打包版 + desktop 文件实测 `hyprctl globalshortcuts` 出现 `cyrene:screenshot`；dev 无 app id 自动回退 | Activated 信号未在 uinput 合成键下触发；真实按键/KDE/GNOME 验证 | P0 |
 | GS-02 | ❌ | 授权/冲突/拒绝 | 无 | 首次授权、冲突提示、禁用状态 | P0 |
 | GS-03 | ❌ | 真实按键触发验证 | `register()` true，合成按键未触发 | 真实按键/portal 事件测试 | P0 |
 | GS-04 | ❌ | per-DE 兜底 | 无 | Hyprland dynamic bind、KDE、Sway、GNOME | P1 |

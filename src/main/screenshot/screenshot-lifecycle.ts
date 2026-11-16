@@ -10,6 +10,7 @@ import { resolveScreenshotHelperPath } from "./helper-path";
 import { captureLinuxScreenshot, pruneScreenshotDirectory } from "./linux-screenshot";
 import { annotateScreenshot } from "../annotation/annotation-window";
 import { installHyprlandScreenshotHotkey } from "./hyprland-hotkey";
+import { GlobalShortcutsPortal, toPortalTrigger } from "../portal/global-shortcuts";
 import { setScreenshotControlHandler } from "../control/control-server";
 import {
   createScreenshotService,
@@ -142,6 +143,8 @@ export function initializeScreenshotService(
   console.log("[Screenshot] helper output-dir =", screenshotDirectory);
 
   let hyprlandHotkey: ReturnType<typeof installHyprlandScreenshotHotkey> = null;
+  let portalHotkey: GlobalShortcutsPortal | null = null;
+  let portalAttempt = 0;
   const service = createScreenshotService({
     client,
     capture,
@@ -161,9 +164,39 @@ export function initializeScreenshotService(
     isAvailable: () => (useLinuxCapture ? true : isHelperAvailable()),
     registerShortcut: (accelerator, callback) => {
       if (hyprlandHotkey) return true;
-      return globalShortcut.register(accelerator, callback);
+      const trigger = toPortalTrigger(accelerator);
+      if (!trigger) return globalShortcut.register(accelerator, callback);
+      const attempt = ++portalAttempt;
+      void (async () => {
+        const portal = new GlobalShortcutsPortal();
+        try {
+          await portal.bind([{
+            id: "screenshot",
+            description: "Cyrene 截图",
+            preferredTrigger: trigger,
+          }]);
+          if (attempt !== portalAttempt) { await portal.close(); return; }
+          portalHotkey = portal;
+          portal.onActivated(() => callback());
+          console.info("[Screenshot] registered global shortcut via portal");
+        } catch (error) {
+          if (attempt !== portalAttempt) { await portal.close(); return; }
+          console.warn(
+            "[Screenshot] GlobalShortcuts portal unavailable, falling back:",
+            error instanceof Error ? error.message : String(error),
+          );
+          globalShortcut.register(accelerator, callback);
+        }
+      })();
+      return true;
     },
-    unregisterShortcut: (accelerator) => globalShortcut.unregister(accelerator),
+    unregisterShortcut: (accelerator) => {
+      portalAttempt += 1;
+      const portal = portalHotkey;
+      portalHotkey = null;
+      if (portal) void portal.close();
+      globalShortcut.unregister(accelerator);
+    },
     sendInsert: (data) => {
       const validated = validateInsert(data);
       const reactChatWindow = getReactChatWindow();
@@ -217,6 +250,7 @@ export function initializeScreenshotService(
   if (hyprlandHotkey) {
     app.once("will-quit", () => hyprlandHotkey?.uninstall());
   }
+  app.once("will-quit", () => { if (portalHotkey) void portalHotkey.close(); });
   service.init(options.initialHotkey);
   return service;
 }

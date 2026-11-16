@@ -24,6 +24,11 @@ for (const stream of [process.stdout, process.stderr]) {
   });
 }
 
+// Portal 用 desktop 文件识别应用；打包版桌面名必须与 .desktop 文件名一致。
+if (process.platform === "linux") {
+  app.setDesktopName("cyrene.desktop");
+}
+
 // 插件设置面板协议：scheme 特权必须在 app.ready 之前注册（Electron 硬性要求）
 registerPluginPanelScheme();
 
