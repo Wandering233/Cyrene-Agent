@@ -120,3 +120,27 @@ setTimeout(() => process.exit(0), 3000);
     client.stop();
   });
 });
+
+describe("PetOverlayHostClient spawn failures", () => {
+  it("rejects when the binary cannot be spawned", async () => {
+    const failures: Error[] = [];
+    const client = new PetOverlayHostClient("/definitely/not/a/host", {
+      onEvent: () => {}, onFailure: (error) => failures.push(error), onLog: () => {},
+    });
+    await expect(client.start(500)).rejects.toThrow();
+    expect(failures.length).toBeGreaterThan(0);
+    client.stop();
+  });
+
+  it("rejects when the host exits before ready", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cyrene-host-exit-test-"));
+    tempDirs.push(dir);
+    const script = path.join(dir, "exit-host.mjs");
+    fs.writeFileSync(script, "#!/usr/bin/env node\nprocess.exit(0);\n", { mode: 0o755 });
+    const client = new PetOverlayHostClient(script, {
+      onEvent: () => {}, onFailure: () => {}, onLog: () => {},
+    });
+    await expect(client.start(1000)).rejects.toThrow();
+    client.stop();
+  });
+});
