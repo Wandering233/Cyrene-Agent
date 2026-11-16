@@ -3,7 +3,7 @@
 > 基线：`e42a45b4 feat(跨平台): 增加 Linux Wayland 原生桌宠 overlay`
 > 环境：Arch Linux + Hyprland 0.57.1 + Wayland，Electron 44.7.2
 > 说明：本文是**全量任务清单与逐项核对结果**；已完成项会随实现更新。
-> 最近更新：截图隐私/清理验收；更新校验和验收；Linux release 工作流；1.25 分数缩放验收；CI/校验和验收；标注取消清理；GS-03 按键触发验收；4K120/600x750 验收；Toast 高对比度；QA-03 60s 验收；soak CPU/fd 采样；Wayland touch 转发；4K 输出性能采样；60s soak/隐藏渲染验收；Toast 键盘可达性；OVL-16 延迟指标；QA-01 宿主集成测试验收；协议校验脚本；UPD-01 本地 feed 验收；OVL-12 协议不匹配 e2e；SHOT-02 窗口截图验收；窗口截图目标；GS-01/GS-04 验收；SHOT-05 多屏截图验收；slurp 选区修复；打包校验和校验；DE 矩阵文档验收；协议 fuzz/reduced motion；宿主校验和；WIN-03 Hyprland 光标回退验收；主题指针；clickCount 单测；QA-04 失败路径；仅 Hyprland 范围；OVL-09 bottom layer；OVL-13；验收状态汇总；overlay soak；overlay 帧统计；Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
+> 最近更新：Doctor AppArmor 检测；截图隐私/清理验收；更新校验和验收；Linux release 工作流；1.25 分数缩放验收；CI/校验和验收；标注取消清理；GS-03 按键触发验收；4K120/600x750 验收；Toast 高对比度；QA-03 60s 验收；soak CPU/fd 采样；Wayland touch 转发；4K 输出性能采样；60s soak/隐藏渲染验收；Toast 键盘可达性；OVL-16 延迟指标；QA-01 宿主集成测试验收；协议校验脚本；UPD-01 本地 feed 验收；OVL-12 协议不匹配 e2e；SHOT-02 窗口截图验收；窗口截图目标；GS-01/GS-04 验收；SHOT-05 多屏截图验收；slurp 选区修复；打包校验和校验；DE 矩阵文档验收；协议 fuzz/reduced motion；宿主校验和；WIN-03 Hyprland 光标回退验收；主题指针；clickCount 单测；QA-04 失败路径；仅 Hyprland 范围；OVL-09 bottom layer；OVL-13；验收状态汇总；overlay soak；overlay 帧统计；Hyprland 光标回退；隐藏桌宠降帧；host 客户端集成测试；Linux CI/协议边界；doctor/安装排障文档；Toast overlay 实机；GlobalShortcuts portal；XDG autostart / `--autostart`（打包实机验证）；overlay 输出选择；宿主崩溃自动重启；协议版本校验；滚轮转发；HiDPI buffer scale（强制 2x 实测）；按输出位置持久化（实机拖拽/重启恢复）。
 
 
 ## 验证范围（按用户指定）
@@ -117,7 +117,7 @@
 | SBX-03 | ✅ | seccomp 二进制 asarUnpack | electron-builder asarUnpack 增加 `@anthropic-ai/sandbox-runtime/vendor/seccomp/**`；打包目录验证解包路径 | 已验收 | P1 |
 | SBX-04 | ✅ | 档位映射 | Linux config 省略 windows；实机 read/write allowWrite 档位 bwrap 执行成功；Linux 单测覆盖 | 已验收 | P0 |
 | SBX-05 | ❌ | 网络 allowlist/DNS/代理 | 无 Linux 网络沙箱 | socat 桥、域名白名单 | P1 |
-| SBX-06 | 🟡 | AppArmor/userns 检测 | 新增 `/proc/sys/kernel/apparmor_restrict_unprivileged_userns` 检测并写启动警告；单测覆盖 | Ubuntu 24.04 实机复现/修复指引 | P1 |
+| SBX-06 | ✅ | AppArmor/userns 检测 | 启动警告 + `cyrene doctor` 检测 `/proc/sys/kernel/apparmor_restrict_unprivileged_userns`；未做 Ubuntu 实机 | 已验收（检测/提示） | P1 |
 | SBX-07 | ✅ | fail-closed 错误/测试 | 缺 socat 时 not_ready；补齐依赖后真实 bwrap 命令成功；单测覆盖两条路径 | 已验收 | P1 |
 | SBX-08 | ✅ | GUI 命令 Wayland socket | 实机 bwrap 内可访问 `/run/user/1000/wayland-1` 与 lock 文件，`WAYLAND_DISPLAY=wayland-1` | 已验收 | P2 |
 | WIN-01 | ❌ | 普通窗口定位/居中/恢复 | 仅 Hyprland 已知 `setBounds` 无效，未修复；未跨 DE | 仅 Hyprland | P1 |

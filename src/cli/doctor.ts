@@ -1,4 +1,4 @@
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
@@ -94,6 +94,17 @@ export function runDoctor(options: DoctorOptions = {}): DoctorResult {
   const hasHost = binaryCandidates.some((candidate) => existsSync(candidate));
   lines.push(`  ${hasHost ? "✓" : "✗"} overlay host binaries found`);
   if (!hasHost) ok = false;
+
+  try {
+    const value = existsSync("/proc/sys/kernel/apparmor_restrict_unprivileged_userns")
+      ? readFileSync("/proc/sys/kernel/apparmor_restrict_unprivileged_userns", "utf8").trim()
+      : "0";
+    lines.push(value === "1"
+      ? "  ⚠ AppArmor restricts unprivileged user namespaces; bwrap may fail"
+      : "  ✓ AppArmor unprivileged userns restriction absent");
+  } catch {
+    lines.push("  ⚠ could not read AppArmor userns restriction");
+  }
 
   const screenshots = path.join(configRoot(env), "Cyrene", "screenshots");
   lines.push(`  ${existsSync(screenshots) ? "✓" : "⚠"} screenshots dir: ${screenshots}`);
