@@ -1,11 +1,9 @@
-import { execFile } from "node:child_process";
+import { spawn } from "node:child_process";
 import { chmod, copyFile, mkdir, readdir, rm, stat } from "node:fs/promises";
 import path from "node:path";
-import { promisify } from "node:util";
+
 import { randomUUID } from "node:crypto";
 import { captureScreenshotViaPortal } from "./portal-screenshot";
-
-const execFileAsync = promisify(execFile);
 
 export class LinuxScreenshotError extends Error {
   constructor(
@@ -104,6 +102,39 @@ export async function captureLinuxScreenshot(
   }
 }
 
+/**
+ * `execFile` gives the child a stdin pipe. `slurp` blocks waiting for input
+ * when stdin is a pipe (confirmed on Hyprland); spawned with stdin ignored it
+ * reads the Wayland pointer normally.
+ */
+function defaultRun(
+  command: string,
+  args: string[],
+): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    const timer = setTimeout(() => {
+      child.kill("SIGTERM");
+      reject(new Error(`${command} timed out`));
+    }, 120_000);
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => { stdout += chunk; });
+    child.stderr.on("data", (chunk: string) => { stderr += chunk; });
+    child.once("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.once("exit", (code, signal) => {
+      clearTimeout(timer);
+      if (code === 0) resolve({ stdout, stderr });
+      else reject(new Error(`${command} exited code=${code} signal=${signal}`));
+    });
+  });
+}
+
 async function commandExists(
   command: string,
   run: (command: string, args: string[]) => Promise<{ stdout: string; stderr: string }>,
@@ -119,18 +150,6 @@ async function commandExists(
       return false;
     }
   }
-}
-
-async function defaultRun(
-  command: string,
-  args: string[],
-): Promise<{ stdout: string; stderr: string }> {
-  const result = await execFileAsync(command, args, {
-    timeout: 120_000,
-    maxBuffer: 1024 * 1024,
-    windowsHide: true,
-  });
-  return { stdout: result.stdout, stderr: result.stderr };
 }
 
 
