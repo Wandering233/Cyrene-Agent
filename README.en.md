@@ -1,3 +1,5 @@
+> This checkout is the `cyreneOnHyprland` fork. Linux verification is limited to Hyprland; see the [Linux / Hyprland guide](docs/linux.md) for setup, current behavior, test evidence, and the Quickshell crash investigation. The general project description below is retained from upstream.
+
 <div align="center">
 
 <img src="./docs/image/preview.png" alt="Cyrene Agent" width="800">
@@ -142,14 +144,14 @@ Building a distributable Windows version (automatically builds both the Electron
 pnpm run package:win:dir
 ```
 
-Linux development and packaging (synchronized adaptation branch; Windows-only capabilities degrade or disable where noted):
+Linux development and packaging for this branch:
 
 ```bash
 pnpm run package:linux:dir   # unpacked directory for quick validation
 pnpm run package:linux       # AppImage + tar.gz
 ```
 
-See [Linux development and adaptation notes](./docs/linux-development.md) (Chinese) for details.
+See [Linux / Hyprland guide](./docs/linux.md) (Chinese) for details.
 
 ### 3. Install BGE-M3 (Recommended)
 
