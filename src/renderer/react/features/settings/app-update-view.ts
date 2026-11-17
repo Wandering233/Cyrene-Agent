@@ -21,7 +21,7 @@ export interface AppUpdateView {
 }
 
 /** 主进程已知的错误码；未知码按通用失败文案兜底 */
-const KNOWN_ERROR_CODES = new Set(["check_failed", "download_failed", "unsupported"]);
+const KNOWN_ERROR_CODES = new Set(["check_failed", "download_failed", "install_failed", "unsupported"]);
 
 export function resolveAppUpdateView(state: AppUpdateState): AppUpdateView {
   switch (state.phase) {
@@ -49,6 +49,8 @@ export function resolveAppUpdateView(state: AppUpdateState): AppUpdateView {
       };
     case "downloaded":
       return { label: { key: "appUpdate.downloaded" }, action: "install", actionLabel: "appUpdate.restartAction", busy: false, badge: true };
+    case "preparing_install":
+      return { label: { key: "appUpdate.preparingInstall" }, action: null, actionLabel: null, busy: true, badge: false };
     case "not_available":
       return { label: { key: "appUpdate.upToDate" }, action: "check", actionLabel: "appUpdate.checkAction", busy: false, badge: false };
     case "error": {

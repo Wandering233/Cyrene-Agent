@@ -36,12 +36,14 @@ export function registerAppUpdateIpc(options: RegisterAppUpdateIpcOptions): void
   // 安装更新不得直接触发退出：先走受控退出完成清理，再把 quitAndInstall 作为最终动作执行。
   ipc.handle(IPC.APP_UPDATE_INSTALL, async () => {
     if (!options.service.canInstall()) return false;
+    if (options.service.prepareInstall && !await options.service.prepareInstall()) return false;
     if (options.requestControlledShutdown) {
+      let installed = false;
       await options.requestControlledShutdown({
         reason: "update-install",
-        finalAction: () => options.service.install(),
+        finalAction: () => { installed = options.service.install(); },
       });
-      return true;
+      return installed;
     }
     return options.service.install();
   });

@@ -779,6 +779,7 @@
     "switchSessionModelTitle": "この会話で使用するモデルを切り替え"
   },
   "appUpdate": {
+    "preparingInstall": "更新を検証し、現在のバージョンを保存しています…",
     "idle": "新しいバージョンを確認できます",
     "checking": "アップデートを確認中…",
     "availableWithVersion": "新しいバージョン v{{version}} が見つかりました",
@@ -794,6 +795,7 @@
       "unsupported": "このインストール方法ではアプリ内更新を利用できません。パッケージマネージャーまたはインストーラーで更新してください。",
       "check_failed": "現在アップデートを確認できません。しばらくしてから再試行してください",
       "download_failed": "アップデートのダウンロードに失敗しました。しばらくしてから再試行してください",
+      "install_failed": "更新の準備に失敗しました。現在のバージョンは保持されています。再試行してください",
       "default": "アップデートサービスでエラーが発生しました。しばらくしてから再試行してください"
     }
   },
@@ -1620,7 +1622,12 @@
     "petZoom": "デスクトップコンパニオンのサイズ",
     "petZoomDescription": "デスクトップコンパニオンの表示倍率を調整します。",
     "screenshotHotkey": "スクリーンショットショートカット",
-    "screenshotHotkeyDescription": "例: Alt+Shift+S。変更後すぐに再登録します。",
+    "screenshotHotkeyDescription": "キーを記録または入力し、適用してください。競合や拒否時は元の設定を保持します。",
+    "shortcutRecording": "キーを押してください。Esc で取消",
+    "shortcutRecord": "キーを記録",
+    "shortcutApply": "適用",
+    "shortcutEnabled": "スクリーンショットキーを有効にする",
+    "shortcutErrors": {"invalid": "修飾キーと一つのキーを指定してください。例: Alt+Shift+S。", "conflict": "このキーは使用中です。別のキーを指定してください。", "denied": "許可が拒否または取消されました。元の設定を保持します。", "unavailable": "登録できませんでした。元の設定を保持します。"},
     "loadFailed": "設定の読み込みに失敗しました。一部の項目が表示されない可能性があります。",
     "autoApply": "設定は自動的に適用されます",
     "general": {

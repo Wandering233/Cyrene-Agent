@@ -366,5 +366,8 @@ export interface SettingsApi {
   channelsGetStatus: () => Promise<Record<string, { phase?: string; message?: string }>>;
   onChannelsStatusChanged: (callback: (status: unknown) => void) => (() => void) | void;
   beginScreenshotHotkeyCapture: () => Promise<boolean>;
+  getScreenshotShortcutStatus: () => Promise<import("../../../shared/screenshot-shortcut").ScreenshotShortcutStatus>;
+  configureScreenshotShortcut: (request: { accelerator: string; enabled: boolean }) =>
+    Promise<import("../../../shared/screenshot-shortcut").ScreenshotShortcutResult>;
   endScreenshotHotkeyCapture: () => Promise<boolean>;
 }

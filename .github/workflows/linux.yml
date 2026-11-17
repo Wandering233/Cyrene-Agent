@@ -2,9 +2,9 @@ name: Linux / Wayland
 
 on:
   push:
-    branches: [main, "feat/linux-support"]
+    branches: [cyreneOnHyprland]
   pull_request:
-    branches: [main]
+    branches: [cyreneOnHyprland]
   workflow_dispatch:
 
 permissions:
@@ -27,6 +27,7 @@ jobs:
       - run: pnpm run check:preload
       - run: pnpm run check:renderer
       - run: pnpm test
+      - run: pnpm run test:linux-artifacts
 
   native:
     runs-on: ubuntu-24.04

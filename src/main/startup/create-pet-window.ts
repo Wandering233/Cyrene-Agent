@@ -2,16 +2,11 @@ import { app, BrowserWindow, screen } from "electron";
 import path from "node:path";
 import { IPC } from "../../shared/ipc-channels";
 import { createPetOverlayWindow, shouldUsePetOverlay } from "../pet-overlay";
+import { normalizeOutputLabel } from "../pet-overlay/output-position";
 
 /** 桌宠窗口的基础尺寸（zoom=1.0 时）。缩放因子改变窗口与模型尺寸，二者同步。 */
 export const PET_WINDOW_BASE_WIDTH = 400;
 export const PET_WINDOW_BASE_HEIGHT = 500;
-
-function normalizeOutputLabel(label: string | undefined): string | undefined {
-  const trimmed = typeof label === "string" ? label.trim() : "";
-  if (!trimmed) return undefined;
-  return trimmed.replace(/^\((.*)\)$/, "$1");
-}
 
 /**
  * 仅创建阶段需要的 GeneralSettings 切片。
@@ -65,13 +60,16 @@ export function createPetWindow(
   const savedByOutput = savedOutput
     ? settings.petWindowPositions?.[savedOutput]
     : undefined;
-  const savedOutputPresent = savedOutput
-    ? screen.getAllDisplays().some(
+  const savedDisplay = savedOutput
+    ? screen.getAllDisplays().find(
       (display) => normalizeOutputLabel(display.label) === savedOutput,
     )
-    : false;
-  const savedX = savedOutputPresent ? savedByOutput?.x : settings.petWindowX;
-  const savedY = savedOutputPresent ? savedByOutput?.y : settings.petWindowY;
+    : undefined;
+  // 按输出保存的是局部坐标，普通窗口和显示器匹配使用全局坐标。
+  const savedX = savedDisplay && savedByOutput
+    ? savedDisplay.bounds.x + savedByOutput.x : settings.petWindowX;
+  const savedY = savedDisplay && savedByOutput
+    ? savedDisplay.bounds.y + savedByOutput.y : settings.petWindowY;
 
   if (savedX !== undefined && savedY !== undefined) {
     const targetBounds = {
@@ -137,6 +135,8 @@ export function createPetWindow(
         alwaysOnTop: settings.petAlwaysOnTop ?? true,
         showOnReady,
         output: outputLabel,
+        outputOrigin: { x: targetDisplay.bounds.x, y: targetDisplay.bounds.y },
+        outputPositions: settings.petWindowPositions,
         scale: overlayScale,
       });
       if (overlay) {

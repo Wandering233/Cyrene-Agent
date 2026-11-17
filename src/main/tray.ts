@@ -1,3 +1,4 @@
+import { openNotifications, openPetMenu } from "./control/control-server";
 import { Menu, nativeImage, Tray, type MenuItemConstructorOptions } from "electron";
 import { detectStatusNotifierWatcher } from "./tray/tray-host";
 import { type WindowActivationRequest } from "./application/window-activation";
@@ -20,6 +21,14 @@ export function buildTrayMenuTemplate(deps: CreateTrayDependencies): MenuItemCon
     {
       label: "打开音乐播放器",
       click: () => { deps.requestActivation({ kind: "music" }); },
+    },
+    {
+      label: "提醒中心",
+      click: () => { void openNotifications().catch((error) => console.warn("[Toast] cannot open notifications:", error)); },
+    },
+    {
+      label: "桌宠菜单（键盘）",
+      click: () => { void openPetMenu().catch((error) => console.warn("[PetMenu] cannot open menu:", error)); },
     },
     {
       label: "设置",

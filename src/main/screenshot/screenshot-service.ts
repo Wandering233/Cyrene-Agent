@@ -17,6 +17,7 @@ export interface ScreenshotService {
     target?: "region" | "window",
   ): Promise<{ ok: boolean; reason?: string }>;
   replaceHotkey(next: string): { ok: boolean; activeHotkey: string | null };
+  setHotkeyEnabled?(enabled: boolean): void;
   suspendHotkey(): void;
   resumeHotkey(): void;
   shutdown(): Promise<void>;
@@ -85,6 +86,8 @@ function reasonFrom(error: unknown): string {
 export function createScreenshotService(deps: ScreenshotServiceDeps): ScreenshotService {
   let activeHotkey: string | null = null;
   let suspendedHotkey: string | null = null;
+  let desiredHotkey: string | null = null;
+  let hotkeyEnabled = true;
   const isAvailable = () => deps.isAvailable?.() ?? true;
 
   const startFromHotkey = async (): Promise<{ ok: boolean; reason?: string }> => {
@@ -171,6 +174,12 @@ export function createScreenshotService(deps: ScreenshotServiceDeps): Screenshot
     next: string,
   ): { ok: boolean; activeHotkey: string | null } => {
     if (!isAvailable()) return { ok: true, activeHotkey: null };
+    desiredHotkey = next;
+    if (!hotkeyEnabled) return { ok: true, activeHotkey: null };
+    if (suspendedHotkey) {
+      suspendedHotkey = next;
+      return { ok: true, activeHotkey: null };
+    }
     const previous = activeHotkey;
     if (previous === next) {
       return { ok: true, activeHotkey: previous };
@@ -207,6 +216,15 @@ export function createScreenshotService(deps: ScreenshotServiceDeps): Screenshot
     startFromHotkey,
     startFromChatButton,
     replaceHotkey,
+    setHotkeyEnabled(enabled) {
+      hotkeyEnabled = enabled;
+      if (!enabled) {
+        if (activeHotkey) deps.unregisterShortcut(activeHotkey);
+        activeHotkey = null;
+      } else if (!suspendedHotkey && desiredHotkey) {
+        replaceHotkey(desiredHotkey);
+      }
+    },
     suspendHotkey() {
       if (!activeHotkey || suspendedHotkey) return;
       suspendedHotkey = activeHotkey;
@@ -215,6 +233,7 @@ export function createScreenshotService(deps: ScreenshotServiceDeps): Screenshot
     },
     resumeHotkey() {
       if (!suspendedHotkey) return;
+      if (!hotkeyEnabled) { suspendedHotkey = null; return; }
       if (register(suspendedHotkey)) {
         activeHotkey = suspendedHotkey;
         suspendedHotkey = null;

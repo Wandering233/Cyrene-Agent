@@ -3,13 +3,14 @@ import * as fs from "fs";
 import { spawn } from "node:child_process";
 import { app, BrowserWindow, ClipboardItem, clipboard, globalShortcut, nativeImage } from "electron";
 import { randomUUID } from "crypto";
+import { normalizeScreenshotShortcut, type ScreenshotShortcutStatus, type ScreenshotShortcutResult } from "../../shared/screenshot-shortcut";
 import { IPC } from "../../shared/ipc-channels";
 import { createIpcScope, type IpcScope } from "../application/ipc-scope";
 import { ElectronScreenshotHelperClient } from "./helper-client";
 import { resolveScreenshotHelperPath } from "./helper-path";
 import { captureLinuxScreenshot, pruneScreenshotDirectory } from "./linux-screenshot";
 import { annotateScreenshot } from "../annotation/annotation-window";
-import { installHyprlandScreenshotHotkey } from "./hyprland-hotkey";
+import { hasHyprlandShortcutConflict, installHyprlandScreenshotHotkey } from "./hyprland-hotkey";
 import { GlobalShortcutsPortal, toPortalTrigger } from "../portal/global-shortcuts";
 import {
   setScreenshotControlHandler,
@@ -26,6 +27,8 @@ export type { ScreenshotService };
 
 export interface ScreenshotLifecycleOptions {
   initialHotkey: string;
+  initialHotkeyEnabled?: boolean;
+  saveShortcutSettings?(settings: { screenshotHotkey: string; screenshotHotkeyEnabled: boolean }): void;
   getReactChatWindow: () => BrowserWindow | null;
   capturePetWindow: () => Promise<Electron.NativeImage | null>;
   /** 传入共享 scope 以便退出时统一注销；缺省时使用独立 scope。 */
@@ -149,6 +152,15 @@ export function initializeScreenshotService(
   let hyprlandHotkey: ReturnType<typeof installHyprlandScreenshotHotkey> = null;
   let portalHotkey: GlobalShortcutsPortal | null = null;
   let portalAttempt = 0;
+  let shortcutStatus: ScreenshotShortcutStatus = { phase: "disabled", accelerator: options.initialHotkey };
+  let lastRegistration: Promise<boolean> = Promise.resolve(true);
+  const setShortcutStatus = (status: ScreenshotShortcutStatus) => { shortcutStatus = status; };
+  const shortcutConflict = (accelerator: string): boolean => {
+    if (process.env.HYPRLAND_INSTANCE_SIGNATURE && process.env.CYRENE_HYPRLAND_HOTKEY !== "0") {
+      return hasHyprlandShortcutConflict(accelerator, hyprlandHotkey?.bind);
+    }
+    return globalShortcut.isRegistered(accelerator) && shortcutStatus.accelerator !== accelerator;
+  };
   const service = createScreenshotService({
     client,
     capture,
@@ -170,39 +182,75 @@ export function initializeScreenshotService(
     },
     isAvailable: () => (useLinuxCapture ? true : isHelperAvailable()),
     registerShortcut: (accelerator, callback) => {
-      if (hyprlandHotkey) return true;
+      lastRegistration = Promise.resolve(false);
+      try {
+        if (!normalizeScreenshotShortcut(accelerator)) {
+          setShortcutStatus({ phase: "error", accelerator, error: "invalid" });
+          return false;
+        }
+        if (shortcutConflict(accelerator)) {
+          setShortcutStatus({ phase: "error", accelerator, error: "conflict" });
+          return false;
+        }
+      } catch {
+        setShortcutStatus({ phase: "error", accelerator, error: "unavailable" });
+        return false;
+      }
+      hyprlandHotkey = installHyprlandScreenshotHotkey(accelerator);
+      if (hyprlandHotkey) {
+        setShortcutStatus({ phase: "active", accelerator, backend: "hyprland" });
+        lastRegistration = Promise.resolve(true);
+        return true;
+      }
       const trigger = toPortalTrigger(accelerator);
-      if (!trigger) return globalShortcut.register(accelerator, callback);
+      if (!trigger) {
+        let registered = false;
+        try { registered = globalShortcut.register(accelerator, callback); } catch { /* unavailable */ }
+        setShortcutStatus(registered
+          ? { phase: "active", accelerator, backend: "electron" }
+          : { phase: "error", accelerator, error: "unavailable" });
+        lastRegistration = Promise.resolve(registered);
+        return registered;
+      }
       const attempt = ++portalAttempt;
-      void (async () => {
-        const portal = new GlobalShortcutsPortal();
+      setShortcutStatus({ phase: "registering", accelerator });
+      lastRegistration = (async () => {
+        const portal = trigger ? new GlobalShortcutsPortal() : null;
         try {
-          await portal.bind([{
-            id: "screenshot",
-            description: "Cyrene 截图",
-            preferredTrigger: trigger,
-          }]);
-          if (attempt !== portalAttempt) { await portal.close(); return; }
+          if (!portal || !trigger) throw new Error("portal trigger unavailable");
+          await portal.bind([{ id: "screenshot", description: "Cyrene 截图", preferredTrigger: trigger }]);
+          if (attempt !== portalAttempt) { await portal.close(); return false; }
           portalHotkey = portal;
           portal.onActivated(() => callback());
-          console.info("[Screenshot] registered global shortcut via portal");
+          setShortcutStatus({ phase: "active", accelerator, backend: "portal" });
+          return true;
         } catch (error) {
-          if (attempt !== portalAttempt) { await portal.close(); return; }
-          console.warn(
-            "[Screenshot] GlobalShortcuts portal unavailable, falling back:",
-            error instanceof Error ? error.message : String(error),
-          );
-          globalShortcut.register(accelerator, callback);
+          await portal?.close().catch(() => {});
+          if (attempt !== portalAttempt) return false;
+          const denied = error instanceof Error && /denied|cancel|response\s*[12]/i.test(error.message);
+          if (denied) {
+            setShortcutStatus({ phase: "error", accelerator, error: "denied" });
+            return false;
+          }
+          let registered = false;
+          try { registered = globalShortcut.register(accelerator, callback); } catch { /* invalid/unsupported */ }
+          setShortcutStatus(registered
+            ? { phase: "active", accelerator, backend: "electron" }
+            : { phase: "error", accelerator, error: "unavailable" });
+          return registered;
         }
       })();
       return true;
     },
     unregisterShortcut: (accelerator) => {
+      hyprlandHotkey?.uninstall();
+      hyprlandHotkey = null;
       portalAttempt += 1;
       const portal = portalHotkey;
       portalHotkey = null;
       if (portal) void portal.close();
       globalShortcut.unregister(accelerator);
+      setShortcutStatus({ phase: "disabled", accelerator });
     },
     sendInsert: (data) => {
       const validated = validateInsert(data);
@@ -211,6 +259,53 @@ export function initializeScreenshotService(
         reactChatWindow.webContents.send(IPC.SCREENSHOT_INSERT, validated);
       }
     },
+  });
+
+  let quitting = false;
+  let configuring = false;
+  let configured = { accelerator: options.initialHotkey, enabled: options.initialHotkeyEnabled !== false };
+  ipc.handle(IPC.SCREENSHOT_SHORTCUT_GET, () => ({ ...shortcutStatus }));
+  ipc.handle(IPC.SCREENSHOT_SHORTCUT_SET, async (_event, request: unknown): Promise<ScreenshotShortcutResult> => {
+    if (quitting || configuring || !request || typeof request !== "object") {
+      return { ok: false, error: "unavailable", status: { ...shortcutStatus } };
+    }
+    const input = request as { accelerator?: unknown; enabled?: unknown };
+    const accelerator = typeof input.accelerator === "string" ? normalizeScreenshotShortcut(input.accelerator) : null;
+    if (!accelerator || typeof input.enabled !== "boolean") {
+      return { ok: false, error: "invalid", status: { ...shortcutStatus } };
+    }
+    configuring = true;
+    const previous = { ...configured };
+    try {
+      if (input.enabled && shortcutConflict(accelerator)) {
+        return { ok: false, error: "conflict", status: { ...shortcutStatus } };
+      }
+      // End recording suspension before registration; the candidate is checked before removing the old binding.
+      service.setHotkeyEnabled?.(false);
+      service.resumeHotkey();
+      service.replaceHotkey(accelerator);
+      setShortcutStatus({ phase: "disabled", accelerator });
+      if (input.enabled) {
+        service.setHotkeyEnabled?.(true);
+        const registered = await lastRegistration;
+        if (quitting) return { ok: false, error: "unavailable", status: { ...shortcutStatus } };
+        if (!registered || shortcutStatus.phase !== "active") {
+          const error = shortcutStatus.error ?? "unavailable";
+          service.setHotkeyEnabled?.(false);
+          service.replaceHotkey(previous.accelerator);
+          if (previous.enabled) { service.setHotkeyEnabled?.(true); await lastRegistration; }
+          return { ok: false, error, status: { ...shortcutStatus } };
+        }
+      }
+      options.saveShortcutSettings?.({ screenshotHotkey: accelerator, screenshotHotkeyEnabled: input.enabled });
+      configured = { accelerator, enabled: input.enabled };
+      return { ok: true, status: { ...shortcutStatus } };
+    } catch {
+      service.setHotkeyEnabled?.(false);
+      service.replaceHotkey(previous.accelerator);
+      if (previous.enabled) { service.setHotkeyEnabled?.(true); await lastRegistration; }
+      return { ok: false, error: "unavailable", status: { ...shortcutStatus } };
+    } finally { configuring = false; }
   });
 
   ipc.handle(IPC.SCREENSHOT_START, async (event) => {
@@ -260,11 +355,8 @@ export function initializeScreenshotService(
     const result = await service.startFromChatButton(undefined, "window");
     if (!result.ok) throw new Error(result.reason ?? "SCREENSHOT_FAILED");
   });
-  hyprlandHotkey = installHyprlandScreenshotHotkey(options.initialHotkey);
-  if (hyprlandHotkey) {
-    app.once("will-quit", () => hyprlandHotkey?.uninstall());
-  }
-  app.once("will-quit", () => { if (portalHotkey) void portalHotkey.close(); });
+  app.once("will-quit", () => { quitting = true; void service.shutdown(); });
+  service.setHotkeyEnabled?.(options.initialHotkeyEnabled !== false);
   service.init(options.initialHotkey);
   return service;
 }

@@ -62,8 +62,13 @@
     "release:dry": "commit-and-tag-version --dry-run",
     "build:overlay-host": "node scripts/build/overlay-host.mjs",
     "verify:linux-artifacts": "node scripts/verify/linux-artifacts.mjs",
+    "test:linux-artifacts": "node --test scripts/verify/linux-artifacts.test.mjs",
     "verify:linux-overlay-soak": "node scripts/verify/linux-overlay-soak.mjs",
-    "verify:overlay-protocol": "node scripts/verify/overlay-protocol-mismatch.mjs"
+    "verify:overlay-protocol": "node scripts/verify/overlay-protocol-mismatch.mjs",
+    "verify:linux-overlay-lifecycle": "node scripts/verify/linux-overlay-lifecycle.mjs",
+    "verify:linux-window-input": "node scripts/verify/linux-overlay-lifecycle.mjs --desktop-input",
+    "verify:linux-appimage-update": "node scripts/verify/linux-appimage-update.mjs",
+    "verify:linux-window-behavior": "node scripts/verify/linux-overlay-lifecycle.mjs --window-behavior"
   },
   "engines": {
     "node": ">=24 <25",

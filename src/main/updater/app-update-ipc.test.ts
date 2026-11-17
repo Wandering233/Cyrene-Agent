@@ -72,4 +72,14 @@ describe("registerAppUpdateIpc", () => {
     expect(await handlers.get(IPC.APP_UPDATE_INSTALL)?.({})).toBe(false);
     expect(service.install).not.toHaveBeenCalled();
   });
+  it("准备失败时不退出；准备成功后才清理，安装失败返回 false", async () => {
+    const handlers=new Map<string,(...args:any[])=>unknown>();const order:string[]=[];
+    let ready=false;
+    const service={...makeService({install:()=>{order.push("install");return false;}}),prepareInstall:vi.fn(async()=>{order.push("prepare");return ready;})};
+    const shutdown=vi.fn(async({finalAction})=>{order.push("cleanup");finalAction();});
+    registerAppUpdateIpc({service,ipcMain:{handle:(channel,handler)=>handlers.set(channel,handler)},requestControlledShutdown:shutdown});
+    expect(await handlers.get(IPC.APP_UPDATE_INSTALL)?.({})).toBe(false);expect(shutdown).not.toHaveBeenCalled();
+    ready=true;order.length=0;expect(await handlers.get(IPC.APP_UPDATE_INSTALL)?.({})).toBe(false);
+    expect(order).toEqual(["prepare","cleanup","install"]);
+  });
 });

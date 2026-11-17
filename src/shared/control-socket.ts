@@ -8,6 +8,8 @@ export const CONTROL_COMMANDS = [
   "screenshot",
   "screenshot-window",
   "toast-test",
+  "show-notifications",
+  "show-pet-menu",
   "quit",
   "ping",
 ] as const;

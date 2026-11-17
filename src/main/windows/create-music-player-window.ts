@@ -1,3 +1,4 @@
+import { attachHyprlandWindowPlacement } from "../linux/window-placement";
 import { app, BrowserWindow, screen } from "electron";
 import * as path from "path";
 import { isDev } from "../env";
@@ -48,6 +49,8 @@ export function createMusicPlayerWindow(): void {
       sandbox: false,
     },
   });
+  attachHyprlandWindowPlacement(window, "music", { x: dx + Math.max(0, Math.floor((dw - width) / 2)),
+    y: dy + Math.max(0, Math.floor((dh - height) / 2)), width, height }, rememberWindowState);
   setMusicPlayerWindow(window);
   attachContextMenu(window);
 

@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, nativeImage, screen } from "electron";
 import { randomUUID } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { attachHyprlandWindowPlacement } from "../linux/window-placement";
 
 export interface AnnotateScreenshotOptions {
   /** Test seam: lets a harness drive the window without manual input. */
@@ -58,6 +59,12 @@ export async function annotateScreenshot(
     path.dirname(filePath),
     `${randomUUID()}-annotated.png`,
   );
+
+  attachHyprlandWindowPlacement(window, "annotation", {
+    x: workArea.x + Math.floor((workArea.width - windowWidth) / 2),
+    y: workArea.y + Math.floor((workArea.height - windowHeight) / 2),
+    width: windowWidth, height: windowHeight,
+  }, false);
 
   let settled = false;
   const finish = (result: string | null): void => {
@@ -200,10 +207,10 @@ const ANNOTATION_HTML = `<!doctype html>
     }
     ctx.putImageData(snapshot, 0, 0);
     ctx.strokeStyle = "#ff4d6d"; ctx.lineWidth = Math.max(2, canvas.width / 400);
-    ctx.beginPath(); ctx.moveTo(start.x, start.y); ctx.lineTo(current.x, current.y); ctx.stroke();
     if (tool === "rect") {
       ctx.strokeRect(start.x, start.y, current.x - start.x, current.y - start.y);
     } else if (tool === "arrow") {
+      ctx.beginPath(); ctx.moveTo(start.x, start.y); ctx.lineTo(current.x, current.y); ctx.stroke();
       const angle = Math.atan2(current.y - start.y, current.x - start.x);
       const head = Math.max(10, canvas.width / 60);
       ctx.beginPath();

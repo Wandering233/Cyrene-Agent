@@ -763,6 +763,7 @@
     "switchSessionModelTitle": "Switch the model for this conversation"
   },
   "appUpdate": {
+    "preparingInstall": "Verifying the update and keeping your current version…",
     "idle": "Ready to check for updates",
     "checking": "Checking for updates…",
     "availableWithVersion": "New version v{{version}} available",
@@ -778,6 +779,7 @@
       "unsupported": "In-app updates are not available for this installation. Please update via your package manager or installer.",
       "check_failed": "Couldn't check for updates right now. Please try again later.",
       "download_failed": "Update download failed. Please try again later.",
+      "install_failed": "Couldn't prepare the update. Your current version was kept. Please try again.",
       "default": "Something went wrong with updates. Please try again later."
     }
   },
@@ -1596,7 +1598,12 @@
     "petZoom": "Companion size",
     "petZoomDescription": "Adjust the desktop companion's scale.",
     "screenshotHotkey": "Screenshot shortcut",
-    "screenshotHotkeyDescription": "e.g. Alt+Shift+S. Changes re-register immediately.",
+    "screenshotHotkeyDescription": "Record or enter a shortcut, then Apply. Conflicts or denied permission keep previous settings.",
+    "shortcutRecording": "Press a shortcut; Esc cancels",
+    "shortcutRecord": "Record keys",
+    "shortcutApply": "Apply",
+    "shortcutEnabled": "Enable screenshot shortcut",
+    "shortcutErrors": {"invalid": "Use a modifier and one key, e.g. Alt+Shift+S.", "conflict": "This shortcut is already in use. Choose another.", "denied": "Permission denied or cancelled. Previous settings kept.", "unavailable": "Could not register shortcut. Previous settings kept."},
     "loadFailed": "Could not load settings. Some options may be unavailable.",
     "autoApply": "Settings are applied automatically",
     "general": {

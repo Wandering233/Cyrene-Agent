@@ -24,6 +24,7 @@ vi.mock("electron", () => ({
     getBounds = vi.fn(() => mocks.restoredBounds);
     isMaximized = vi.fn(() => mocks.maximized);
     setBounds = mocks.setBounds;
+    setMenuBarVisibility = vi.fn();
     loadFile = vi.fn((file: string) => mocks.loadedFiles.push(file));
     loadURL = vi.fn((url: string) => mocks.loadedUrls.push(url));
     constructor(options: Record<string, unknown>) {
@@ -36,6 +37,8 @@ vi.mock("electron", () => ({
     getDisplayNearestPoint: () => ({ workArea: { x: 0, y: 0, width: 2560, height: 1400 } }),
   },
 }));
+vi.mock("../linux/window-placement", async (importOriginal) => ({ ...await importOriginal<typeof import("../linux/window-placement")>(),
+  attachHyprlandWindowPlacement: vi.fn(), readWindowBounds: vi.fn() }));
 vi.mock("../env", () => ({ isDev: false }));
 vi.mock("../settings/settings-facade", () => ({
   loadGeneralSettings: () => ({ rememberWindowState: true, uiTheme: mocks.themeChoice }),
@@ -56,7 +59,8 @@ vi.mock("./window-state", () => ({
   stickerManagerWindow: null,
 }));
 
-import { createCallWindow, createReactChatWindowShell, persistedWindowState } from "./create-aux-windows";
+import { createCallWindow, createOnboardingBrowserWindow, createReactChatWindowShell, createStickerManagerWindow, persistedWindowState } from "./create-aux-windows";
+import { attachHyprlandWindowPlacement } from "../linux/window-placement";
 
 function lastBrowserWindowOptions() {
   const options = mocks.browserWindowOptions.at(-1);
@@ -95,6 +99,16 @@ describe("React call window", () => {
 
     expect(mocks.loadedFiles.at(-1)?.replaceAll("\\", "/")).toContain("dist/renderer/call-react/index.html");
     expect(lastBrowserWindowOptions()).toMatchObject({ width: 420, height: 800, frame: false });
+    expect(attachHyprlandWindowPlacement).toHaveBeenLastCalledWith(expect.anything(), "call", {x:750,y:140,width:420,height:800}, true);
+  });
+});
+
+describe("辅助窗口定位", () => {
+  it("欢迎和表情窗口使用工作区坐标，欢迎窗口不恢复上次尺寸", async () => {
+    createOnboardingBrowserWindow();
+    expect(attachHyprlandWindowPlacement).toHaveBeenLastCalledWith(expect.anything(), "onboarding", {x:520,y:130,width:880,height:820}, false);
+    await createStickerManagerWindow();
+    expect(attachHyprlandWindowPlacement).toHaveBeenLastCalledWith(expect.anything(), "stickers", {x:700,y:330,width:520,height:420}, true);
   });
 });
 

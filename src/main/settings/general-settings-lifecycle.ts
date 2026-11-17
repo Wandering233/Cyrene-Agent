@@ -17,7 +17,10 @@ import { getEffectiveUiTheme } from "../system-ui-theme";
 export interface GeneralSettingsLifecycleDependencies {
   get windowManager(): WindowManager | null;
   get tray(): Tray | null;
-  get screenshotService(): { replaceHotkey: (hotkey: string) => { ok: boolean } | null } | null;
+  get screenshotService(): {
+    replaceHotkey: (hotkey: string) => { ok: boolean } | null;
+    setHotkeyEnabled?(enabled: boolean): void;
+  } | null;
   get proactiveLifecycle(): { getProactiveChatService: () => { invalidate: () => void } | null };
   broadcastToAuxWindows(channel: string, payload: unknown): void;
 }
@@ -157,6 +160,9 @@ export function handleGeneralSettingsChanged(
   }
   if (before.uiIcon !== after.uiIcon) {
     applyUiIcon(after.uiIcon, deps);
+  }
+  if (before.screenshotHotkeyEnabled !== after.screenshotHotkeyEnabled) {
+    deps.screenshotService?.setHotkeyEnabled?.(after.screenshotHotkeyEnabled !== false);
   }
   if (before.screenshotHotkey !== after.screenshotHotkey) {
     const result = deps.screenshotService?.replaceHotkey(after.screenshotHotkey);

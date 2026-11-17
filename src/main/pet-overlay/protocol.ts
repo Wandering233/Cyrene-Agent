@@ -9,7 +9,7 @@
  */
 
 export const PROTOCOL_VERSION = 1;
-export const OVERLAY_HOST_VERSION = "0.1.0";
+export const OVERLAY_HOST_VERSION = "0.1.5";
 
 export interface InitMessage {
   type: "init";
@@ -21,7 +21,7 @@ export interface InitMessage {
   scale: number;
   output?: string;
   namespace?: string;
-  layer?: "top" | "overlay";
+  layer?: "top" | "overlay" | "bottom";
 }
 
 export interface ResizeMessage {
@@ -51,11 +51,16 @@ export interface InteractiveMessage {
 
 export interface LayerMessage {
   type: "layer";
-  layer: "top" | "overlay";
+  layer: "top" | "overlay" | "bottom";
 }
 
 export interface QuitMessage {
   type: "quit";
+}
+
+export interface CursorMessage {
+  type: "cursor";
+  cursor: string;
 }
 
 export type ControlMessage =
@@ -66,6 +71,7 @@ export type ControlMessage =
   | HideMessage
   | InteractiveMessage
   | LayerMessage
+  | CursorMessage
   | QuitMessage;
 
 export interface FrameHeader {
@@ -92,6 +98,7 @@ export type PointerEventName =
   | "motion"
   | "down"
   | "up"
+  | "cancel"
   | "axis";
 
 export interface PointerEvent {
@@ -118,6 +125,10 @@ export interface PositionEvent {
   type: "position";
   x: number;
   y: number;
+  output?: string | null;
+  output_x?: number;
+  output_y?: number;
+  scale?: number;
 }
 
 export interface ErrorEvent {

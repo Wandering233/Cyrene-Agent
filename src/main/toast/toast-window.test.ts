@@ -141,3 +141,19 @@ describe("createToastWindowController · Wayland overlay", () => {
     expect(createWindow).not.toHaveBeenCalled();
   });
 });
+
+describe("普通提醒异步显示取消", () => {
+  it("准备期间队列清空不会再显示，销毁后不重建窗口", async () => {
+    const win=Object.assign(createWindowStub(),{destroy:vi.fn()});let finish:(()=>void)|undefined;let allowed:(()=>boolean)|undefined;
+    const createWindow=vi.fn(()=>win as never);
+    const showInactiveWindow=vi.fn((_window:unknown,shouldShow:()=>boolean)=>new Promise<void>(resolve=>{
+      allowed=shouldShow;finish=()=>{if(shouldShow())win.showInactive();resolve();};
+    }));
+    const controller=createToastWindowController({createWindow,showInactiveWindow,getChatWindow:()=>null,
+      getDisplayMatching:()=>({workArea:WORKAREA}),getCursorScreenPoint:()=>({x:0,y:0})});
+    controller.syncVisibility(true);controller.syncVisibility(true);expect(showInactiveWindow).toHaveBeenCalledOnce();
+    controller.syncVisibility(false);expect(allowed?.()).toBe(false);finish?.();await Promise.resolve();await Promise.resolve();
+    expect(win.showInactive).not.toHaveBeenCalled();
+    controller.dispose();controller.preload();controller.syncVisibility(true);expect(createWindow).toHaveBeenCalledOnce();
+  });
+});

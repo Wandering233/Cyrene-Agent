@@ -4,6 +4,7 @@ export type AppUpdatePhase =
   | "available"
   | "downloading"
   | "downloaded"
+  | "preparing_install"
   | "not_available"
   | "error";
 

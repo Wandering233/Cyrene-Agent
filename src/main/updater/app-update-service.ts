@@ -17,6 +17,8 @@ export interface AppUpdaterLike {
   checkForUpdates(): Promise<unknown>;
   downloadUpdate(): Promise<unknown>;
   quitAndInstall(isSilent?: boolean, isForceRunAfter?: boolean): void;
+  prepareInstall?(): Promise<void>;
+  installPreparedUpdate?(): boolean;
 }
 
 export interface AppUpdateService {
@@ -26,6 +28,7 @@ export interface AppUpdateService {
   /** 是否满足安装条件；与 install() 拆开，保证没有清理完成前不会启动安装器。 */
   canInstall(): boolean;
   install(): boolean;
+  prepareInstall?(): Promise<boolean>;
   onStateChanged(listener: (state: AppUpdateState) => void): () => void;
 }
 
@@ -43,6 +46,8 @@ export function createAppUpdateService(options: CreateAppUpdateServiceOptions): 
   let state: AppUpdateState = { phase: "idle", currentVersion };
   let checkPromise: Promise<unknown> | null = null;
   let downloadPromise: Promise<unknown> | null = null;
+  let preparing: Promise<boolean> | null = null;
+  let prepared = false;
   const listeners = new Set<(state: AppUpdateState) => void>();
 
   updater.autoDownload = false;
@@ -62,13 +67,13 @@ export function createAppUpdateService(options: CreateAppUpdateServiceOptions): 
     for (const listener of listeners) listener({ ...state });
   };
 
-  updater.on("checking-for-update", () => publish({ phase: "checking" }));
-  updater.on("update-available", (info) => publish({
+  updater.on("checking-for-update", () => { if (!preparing && !prepared) publish({ phase: "checking" }); });
+  updater.on("update-available", (info) => { if (!preparing && !prepared) publish({
     phase: "available",
     availableVersion: typeof info?.version === "string" ? info.version : undefined,
     releaseNotesHtml: normalizeReleaseNotes(info?.releaseNotes),
-  }));
-  updater.on("update-not-available", () => publish({ phase: "not_available" }));
+  }); });
+  updater.on("update-not-available", () => { if (!preparing && !prepared) publish({ phase: "not_available" }); });
   updater.on("download-progress", (progress) => publish({
     phase: "downloading",
     percent: finiteNumber(progress?.percent),
@@ -91,6 +96,7 @@ export function createAppUpdateService(options: CreateAppUpdateServiceOptions): 
   return {
     getState: () => ({ ...state }),
     async check() {
+      if (preparing || prepared) return { ...state };
       if (!isPackaged) {
         publish({ phase: "not_available" });
         return { ...state };
@@ -111,6 +117,7 @@ export function createAppUpdateService(options: CreateAppUpdateServiceOptions): 
       return { ...state };
     },
     async download() {
+      if (preparing || prepared) return { ...state };
       if (!isPackaged) return { ...state };
       if (!supported) return { ...state };
       if (!downloadPromise && state.phase !== "downloaded") {
@@ -125,10 +132,25 @@ export function createAppUpdateService(options: CreateAppUpdateServiceOptions): 
       return { ...state };
     },
     canInstall() {
-      return supported && isPackaged && state.phase === "downloaded";
+      return supported && isPackaged && (state.phase === "downloaded" || (state.phase === "preparing_install" && prepared));
+    },
+    async prepareInstall() {
+      if (!this.canInstall()) return false;
+      if (updater.prepareInstall) publish({ phase: "preparing_install" });
+      if (!preparing) preparing = (async () => {
+        try { await updater.prepareInstall?.(); prepared = true; return true; }
+        catch { publish({ phase: "error", error: "install_failed" }); return false; }
+        finally { preparing = null; }
+      })();
+      return preparing;
     },
     install() {
       if (!this.canInstall()) return false;
+      if (updater.installPreparedUpdate) {
+        const installed = updater.installPreparedUpdate();
+        if (!installed) { prepared = false; publish({ phase: "error", error: "install_failed" }); }
+        return installed;
+      }
       // 静默安装：跳过 NSIS 完整向导，不再让用户选"为所有人/仅为我"，
       // 避免 perMachine 切换导致安装目录漂移（旧目录被卸载器清空、新目录落到 C 盘）。
       // 升级时安装目录里的用户内容由 NSIS 脚本（installer.nsh）暂存保护。

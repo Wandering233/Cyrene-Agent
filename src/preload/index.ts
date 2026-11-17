@@ -36,6 +36,7 @@ const rendererTargetId = crypto.randomUUID();
 const cyreneApi = {
   /** True only for the hidden offscreen renderer hosted by the native Wayland overlay. */
   petOverlayMode: process.argv.includes("--cyrene-pet-overlay=1"),
+  openPetMenu: () => ipcRenderer.invoke(IPC.PET_MENU_OPEN),
   minimize: () => ipcRenderer.send(IPC.WINDOW_MINIMIZE),
   hide: () => ipcRenderer.send(IPC.WINDOW_CLOSE),
   quit: () => ipcRenderer.send(IPC.APP_QUIT),
@@ -527,6 +528,9 @@ const settingsApi = {
   },
   // 截图热键捕获（设置页临时挂起全局快捷键）
   beginScreenshotHotkeyCapture: () => ipcRenderer.invoke(IPC.SCREENSHOT_HOTKEY_CAPTURE_START),
+  getScreenshotShortcutStatus: () => ipcRenderer.invoke(IPC.SCREENSHOT_SHORTCUT_GET),
+  configureScreenshotShortcut: (request: { accelerator: string; enabled: boolean }) =>
+    ipcRenderer.invoke(IPC.SCREENSHOT_SHORTCUT_SET, request),
   endScreenshotHotkeyCapture: () => ipcRenderer.invoke(IPC.SCREENSHOT_HOTKEY_CAPTURE_END),
 };
 

@@ -12,6 +12,7 @@ import { createApplication } from "./application/application";
 import { createDefaultApplicationDependencies } from "./application/default-dependencies";
 import { registerPluginPanelScheme } from "./plugin-panel-protocol";
 import { installGlobalNavigationGuard } from "./windows/external-link";
+import { recoverAppImageBeforeStartup } from "./updater/transactional-appimage-updater";
 
 // 打包版双击启动时 stdout/stderr 管道可能不存在或中途关闭，
 // 此时任何 console.log 写入都会抛异步 EPIPE 并升级成 uncaughtException 弹错误框
@@ -43,6 +44,9 @@ application.prepareBeforeReady();
 
 if (application.isPrimaryProcess()) {
   void app.whenReady()
-    .then(() => application.start())
+    .then(async () => {
+      if (await recoverAppImageBeforeStartup()) { app.exit(0); return; }
+      await application.start();
+    })
     .catch((error) => application.handleFatalStartup(error));
 }

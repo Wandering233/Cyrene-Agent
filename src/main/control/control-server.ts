@@ -17,7 +17,26 @@ export interface ControlServerHandlers {
 
 let screenshotHandler: (() => void | Promise<void>) | null = null;
 let screenshotWindowHandler: (() => void | Promise<void>) | null = null;
+let notificationsHandler: (() => void | Promise<void>) | null = null;
+let petMenuHandler: (() => void | Promise<void>) | null = null;
 let toastTestHandler: (() => void | Promise<void>) | null = null;
+
+export async function openNotifications(): Promise<void> {
+  if (notificationsHandler) await notificationsHandler();
+}
+
+export async function openPetMenu(): Promise<void> {
+  if (!petMenuHandler) throw new Error("pet menu backend not ready");
+  await petMenuHandler();
+}
+
+export function setPetMenuControlHandler(handler: (() => void | Promise<void>) | null): void {
+  petMenuHandler = handler;
+}
+
+export function setNotificationsControlHandler(handler: (() => void | Promise<void>) | null): void {
+  notificationsHandler = handler;
+}
 
 /** Register the screenshot action after the core screenshot service exists. */
 export function setScreenshotWindowControlHandler(
@@ -92,11 +111,16 @@ export function startControlServer(
       } else if (command === "screenshot-window") {
         if (!screenshotWindowHandler) throw new Error("screenshot backend not ready");
         await screenshotWindowHandler();
+      } else if (command === "show-notifications") {
+        if (!notificationsHandler) throw new Error("notifications backend not ready");
+        await notificationsHandler();
+      } else if (command === "show-pet-menu") {
+        await openPetMenu();
       } else if (command === "toast-test") {
         if (!toastTestHandler) throw new Error("toast backend not ready");
         await toastTestHandler();
       } else {
-        await handlers[command as Exclude<ControlCommand, "ping" | "screenshot" | "screenshot-window" | "toast-test">]();
+        await handlers[command as Exclude<ControlCommand, "ping" | "screenshot" | "screenshot-window" | "toast-test" | "show-notifications" | "show-pet-menu">]();
       }
       socket.write(JSON.stringify({ ok: true, command }) + "\n");
     } catch (error) {

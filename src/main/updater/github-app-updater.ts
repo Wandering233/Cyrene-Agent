@@ -1,6 +1,6 @@
 import * as path from "node:path";
 import { app } from "electron";
-import { autoUpdater } from "electron-updater";
+import { getAppUpdater } from "./transactional-appimage-updater";
 import { createAppUpdateService, type AppUpdateService, type AppUpdaterLike } from "./app-update-service";
 import { isLinuxAppImageUpdateSupported } from "./linux-update-support";
 
@@ -8,6 +8,7 @@ export function createGitHubAppUpdateService(options: {
   currentVersion: string;
   isPackaged: boolean;
 }): AppUpdateService {
+  const autoUpdater = getAppUpdater();
   if (options.isPackaged) {
     // 钉死升级安装目录：即使注册表 InstallLocation 缺失/漂移，
     // 静默升级也强制装回当前运行目录（NsisUpdater 会把它作为 /D= 参数传给安装器）。

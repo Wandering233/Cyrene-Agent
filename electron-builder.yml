@@ -86,8 +86,14 @@ nsis:
   installerSidebar: build/installer/installer-sidebar.bmp
   uninstallerSidebar: build/installer/installer-sidebar.bmp
 linux:
+  publish:
+    provider: github
+    owner: Wandering233
+    repo: Cyrene-Agent
   icon: assets/icon-presets/cyrene-sun.png
   extraResources:
+    - from: scripts/update/appimage-worker.py
+      to: bin/appimage-worker.py
     - from: resources/bin/linux/cyrene-overlay-host
       to: bin/cyrene-overlay-host
     - from: resources/bin/linux/cyrene-overlay-fullscreen

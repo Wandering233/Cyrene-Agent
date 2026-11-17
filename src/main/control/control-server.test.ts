@@ -3,7 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import net from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { setScreenshotControlHandler, startControlServer } from "./control-server";
+import { setPetMenuControlHandler, setScreenshotControlHandler, startControlServer } from "./control-server";
 
 const tempDirs: string[] = [];
 
@@ -94,5 +94,18 @@ describe("control socket", () => {
       server.close();
     }
     expect(fs.existsSync(socketPath)).toBe(false);
+  });
+  it("桌宠菜单明确报告未就绪和加载失败，成功时调用一次入口", async () => {
+    const socketPath = makeSocketPath();
+    const server = startControlServer({"show-chat": vi.fn(), "show-settings": vi.fn(), "toggle-pet": vi.fn(), quit: vi.fn()}, socketPath);
+    try {
+      setPetMenuControlHandler(null);
+      expect(await send(socketPath,"show-pet-menu")).toMatchObject({ok:false,error:"pet menu backend not ready"});
+      const open = vi.fn(); setPetMenuControlHandler(open);
+      expect(await send(socketPath,"show-pet-menu")).toEqual({ok:true,command:"show-pet-menu"});
+      expect(open).toHaveBeenCalledOnce();
+      setPetMenuControlHandler(async()=>{throw new Error("menu load failed");});
+      expect(await send(socketPath,"show-pet-menu")).toMatchObject({ok:false,error:"menu load failed"});
+    } finally { server.close(); setPetMenuControlHandler(null); }
   });
 });

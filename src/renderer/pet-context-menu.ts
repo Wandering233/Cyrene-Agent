@@ -55,7 +55,7 @@ export function installPetContextMenu(): void {
   const hide = (): void => { menu.style.display = "none"; };
 
   const cyrene = (window as unknown as {
-    cyrene?: { hide?: () => void; quit?: () => void };
+    cyrene?: { hide?: () => void; quit?: () => void; openPetMenu?: () => Promise<unknown> };
     settings?: { openSection?: (section?: string) => Promise<unknown> };
   }).cyrene;
   const settings = (window as unknown as {
@@ -63,13 +63,14 @@ export function installPetContextMenu(): void {
   }).settings;
 
   addItem("设置", () => { void settings?.openSection?.("appearance"); });
+  addItem("键盘菜单", () => { void cyrene?.openPetMenu?.(); });
   addItem("隐藏桌宠", () => { cyrene?.hide?.(); });
   addItem("退出", () => { cyrene?.quit?.(); });
 
   window.addEventListener("contextmenu", (event) => {
     event.preventDefault();
     const x = Math.min(event.clientX, Math.max(0, window.innerWidth - 180));
-    const y = Math.min(event.clientY, Math.max(0, window.innerHeight - 140));
+    const y = Math.min(event.clientY, Math.max(0, window.innerHeight - 180));
     menu.style.left = `${x}px`;
     menu.style.top = `${y}px`;
     menu.style.display = "block";

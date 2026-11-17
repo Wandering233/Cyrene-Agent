@@ -11,10 +11,16 @@
 mod alpha;
 #[path = "../protocol.rs"]
 mod protocol;
+#[path = "../stream.rs"]
+mod stream;
+#[path = "../cursor.rs"]
+mod cursor;
+#[path = "../touch_input.rs"]
+mod touch_input;
 
 use std::{
     env,
-    io::{BufRead, BufReader, Read, Write},
+    io::{BufReader, Write},
     os::unix::net::UnixStream,
     path::PathBuf,
     sync::{Arc, Mutex},
@@ -29,19 +35,19 @@ use calloop::{
     channel::{Event as ChannelEvent, Sender, channel},
 };
 use protocol::{Control, FrameHeader, HostEvent, PointerEventName};
-use serde_json::Value;
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState},
     delegate_compositor, delegate_output, delegate_pointer, delegate_registry,
-    delegate_relative_pointer, delegate_seat, delegate_shm, delegate_xdg_shell,
+    delegate_relative_pointer, delegate_seat, delegate_shm, delegate_touch, delegate_xdg_shell,
     delegate_xdg_window,
     output::{OutputHandler, OutputState},
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
     seat::{
         Capability, SeatHandler, SeatState,
-        pointer::{PointerEvent, PointerEventKind, PointerHandler},
+        pointer::{PointerData, PointerEvent, PointerEventKind, PointerHandler, ThemeSpec, ThemedPointer},
         relative_pointer::{RelativeMotionEvent, RelativePointerHandler, RelativePointerState},
+        touch::{TouchData, TouchHandler},
     },
     shell::{
         WaylandSurface,
@@ -57,14 +63,13 @@ use smithay_client_toolkit::{
 };
 use tracing::{info, warn};
 use wayland_client::{
-    Connection, Dispatch, QueueHandle,
+    Connection, Dispatch, Proxy, QueueHandle,
     globals::registry_queue_init,
-    protocol::{wl_output, wl_pointer, wl_region, wl_seat, wl_shm, wl_surface},
+    protocol::{wl_output, wl_pointer, wl_region, wl_seat, wl_shm, wl_surface, wl_touch::WlTouch},
 };
 use wayland_protocols::wp::relative_pointer::zv1::client::zwp_relative_pointer_v1::ZwpRelativePointerV1;
 
 const PROTOCOL_VERSION: u32 = 1;
-const MAX_FRAME_BYTES: usize = 128 * 1024 * 1024;
 const ALPHA_THRESHOLD: u8 = 10;
 const REGION_CELL: u32 = 4;
 const BUFFER_COUNT: usize = 2;
@@ -92,6 +97,10 @@ enum Inbound {
 }
 
 fn main() -> Result<()> {
+    if env::args().any(|arg| arg == "--version") {
+        println!("cyrene-overlay-fullscreen {}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -139,70 +148,18 @@ fn connect_with_retry(path: &PathBuf) -> Result<UnixStream> {
     ))
 }
 
-fn spawn_reader(stream: UnixStream, sender: Sender<Inbound>) {
+fn spawn_reader(socket: UnixStream, sender: Sender<Inbound>) {
     thread::spawn(move || {
-        let mut reader = BufReader::new(stream);
+        let mut reader = BufReader::new(socket);
+        let mut decoder = stream::Decoder::default();
         loop {
-            let mut line = String::new();
-            match reader.read_line(&mut line) {
-                Ok(0) => {
-                    let _ = sender.send(Inbound::Closed);
-                    return;
-                }
-                Ok(_) => {}
-                Err(err) => {
-                    let _ = sender.send(Inbound::Error(err.to_string()));
-                    return;
-                }
-            }
-            if line.len() > 1024 * 1024 {
-                let _ = sender.send(Inbound::Error("line too long".into()));
-                return;
-            }
-            let value: Value = match serde_json::from_str(&line) {
-                Ok(v) => v,
-                Err(e) => {
-                    let _ = sender.send(Inbound::Error(e.to_string()));
-                    return;
-                }
+            let inbound = match decoder.next(&mut reader) {
+                Ok(Some(stream::Message::Control(control))) => Inbound::Control(control),
+                Ok(Some(stream::Message::Frame(header, pixels))) => Inbound::Frame(header, pixels),
+                Ok(None) => { let _ = sender.send(Inbound::Closed); return; },
+                Err(error) => { let _ = sender.send(Inbound::Error(error)); return; },
             };
-            if value.get("type").and_then(Value::as_str) == Some("frame") {
-                let header: FrameHeader = match serde_json::from_value(value) {
-                    Ok(h) => h,
-                    Err(e) => {
-                        let _ = sender.send(Inbound::Error(e.to_string()));
-                        return;
-                    }
-                };
-                let Some(len) = header.byte_len() else {
-                    let _ = sender.send(Inbound::Error("bad stride".into()));
-                    return;
-                };
-                if len > MAX_FRAME_BYTES {
-                    let _ = sender.send(Inbound::Error("frame too large".into()));
-                    return;
-                }
-                let mut pixels = vec![0u8; len];
-                if let Err(err) = reader.read_exact(&mut pixels) {
-                    let _ = sender.send(Inbound::Error(err.to_string()));
-                    return;
-                }
-                if sender.send(Inbound::Frame(header, pixels)).is_err() {
-                    return;
-                }
-            } else {
-                match serde_json::from_value::<Control>(value) {
-                    Ok(control) => {
-                        if sender.send(Inbound::Control(control)).is_err() {
-                            return;
-                        }
-                    }
-                    Err(err) => {
-                        let _ = sender.send(Inbound::Error(err.to_string()));
-                        return;
-                    }
-                }
-            }
+            if sender.send(inbound).is_err() { return; }
         }
     });
 }
@@ -235,6 +192,7 @@ fn run(reader: UnixStream, writer: EventWriter) -> Result<()> {
     let (sender, channel) = channel::<Inbound>();
     spawn_reader(reader, sender);
     let mut state = State {
+        connection: conn.clone(),
         registry_state: RegistryState::new(&globals),
         seat_state: SeatState::new(&globals, &qh),
         output_state: OutputState::new(&globals, &qh),
@@ -256,12 +214,18 @@ fn run(reader: UnixStream, writer: EventWriter) -> Result<()> {
         latest: None,
         last_pet: None,
         pointer: None,
+        themed_pointer: None,
+        cursor: "default".into(),
+        pointer_focused: false,
+        touch: None,
+        touch_input: touch_input::TouchInput::default(),
         relative_pointer: None,
         drag: None,
         writer,
         signal,
         quit: false,
         ready_sent: false,
+        initialized: false,
         output: None,
         fullscreen_requested: false,
     };
@@ -287,6 +251,7 @@ fn run(reader: UnixStream, writer: EventWriter) -> Result<()> {
 }
 
 struct State {
+    connection: Connection,
     registry_state: RegistryState,
     seat_state: SeatState,
     output_state: OutputState,
@@ -308,12 +273,18 @@ struct State {
     latest: Option<(FrameHeader, Vec<u8>)>,
     last_pet: Option<Rect>,
     pointer: Option<wl_pointer::WlPointer>,
+    themed_pointer: Option<ThemedPointer>,
+    cursor: String,
+    pointer_focused: bool,
+    touch: Option<WlTouch>,
+    touch_input: touch_input::TouchInput,
     relative_pointer: Option<ZwpRelativePointerV1>,
     drag: Option<Drag>,
     writer: EventWriter,
     signal: LoopSignal,
     quit: bool,
     ready_sent: bool,
+    initialized: bool,
     output: Option<wl_output::WlOutput>,
     fullscreen_requested: bool,
 }
@@ -351,6 +322,7 @@ impl State {
                 height,
                 x,
                 y,
+                output,
                 ..
             } => {
                 if let Some(version) = protocol {
@@ -367,6 +339,17 @@ impl State {
                 self.pet_h = height.max(1);
                 self.x = x;
                 self.y = y;
+                self.initialized = true;
+                if let Some(name) = output {
+                    if let Some(target) = self.output_state.outputs().find(|o| {
+                        self.output_state.info(o).and_then(|i| i.name).as_deref() == Some(name.as_str())
+                    }) {
+                        self.cancel_touch();
+                        self.output = Some(target);
+                        self.window.set_fullscreen(self.output.as_ref());
+                        self.window.commit();
+                    }
+                }
                 self.clamp();
                 self.redraw();
                 if !self.ready_sent {
@@ -391,11 +374,20 @@ impl State {
                 self.redraw();
             }
             Control::Hide => {
+                self.cancel_touch();
+                self.cancel_drag();
+                self.pointer_focused = false;
                 self.visible = false;
                 self.window.wl_surface().attach(None, 0, 0);
                 self.window.commit();
             }
             Control::Interactive { .. } | Control::Layer { .. } => {}
+            Control::Cursor { cursor } => {
+                self.cursor = cursor;
+                if self.pointer_focused {
+                    if let Some(pointer) = &self.themed_pointer { cursor::apply(pointer, &self.connection, &self.cursor); }
+                }
+            }
             Control::Quit => self.stop(),
         }
     }
@@ -433,9 +425,16 @@ impl State {
     }
 
     fn position(&self) {
+        if !self.initialized { return; }
+        let info = self.output.as_ref().and_then(|output| self.output_state.info(output));
+        let origin = info.as_ref().and_then(|info| info.logical_position).unwrap_or((0, 0));
         self.writer.send(&HostEvent::Position {
             x: self.x,
             y: self.y,
+            output: info.and_then(|info| info.name),
+            output_x: origin.0,
+            output_y: origin.1,
+            scale: 1,
         });
     }
 
@@ -582,6 +581,28 @@ impl State {
         self.apply_input_rects(rects);
     }
 
+    fn send_touch(&self, event: touch_input::TouchEvent, time: Option<u32>) {
+        let (x, y) = event.position;
+        if event.event == PointerEventName::Down {
+            self.send_pointer(PointerEventName::Enter, x, y, None, time);
+            self.send_pointer(PointerEventName::Motion, x, y, None, time);
+        }
+        let button = if event.event == PointerEventName::Motion { None } else { Some(0x110) };
+        self.send_pointer(event.event, x, y, button, time);
+        if event.event == PointerEventName::Up { self.send_pointer(PointerEventName::Leave, x, y, None, time); }
+    }
+
+    fn cancel_touch(&mut self) {
+        if let Some(event) = self.touch_input.cancel() { self.send_touch(event, None); }
+    }
+
+    fn cancel_drag(&mut self) {
+        if let Some(drag) = self.drag.take() {
+            self.send_pointer(PointerEventName::Cancel, self.x as f64, self.y as f64, Some(drag.button), None);
+            if drag.started { self.writer.send(&HostEvent::Drag { phase: protocol::DragPhase::End, x: self.x, y: self.y }); }
+        }
+    }
+
     fn apply_input_rects(&mut self, rects: Vec<Rect>) {
         let region = self.compositor.wl_compositor().create_region(&self.qh, ());
         for r in &rects {
@@ -645,6 +666,7 @@ impl CompositorHandler for State {
         output: &wl_output::WlOutput,
     ) {
         self.output = Some(output.clone());
+        self.position();
     }
     fn surface_leave(
         &mut self,
@@ -681,8 +703,8 @@ impl WindowHandler for State {
         let height = configure.new_size.1.map(|v| v.get()).unwrap_or(1080);
         self.screen_w = width;
         self.screen_h = height;
-        self.pool = None;
         self.buffers.clear();
+        self.pool = None;
         self.last_pet = None;
         self.ensure_pool();
         if let Some(pool) = self.pool.as_mut() {
@@ -700,6 +722,7 @@ impl WindowHandler for State {
         }
         self.clamp();
         self.redraw();
+        self.position();
         if !self.ready_sent {
             self.ready();
         }
@@ -718,13 +741,19 @@ impl SeatHandler for State {
         seat: wl_seat::WlSeat,
         capability: Capability,
     ) {
+        if capability == Capability::Touch && self.touch.is_none() {
+            self.touch = self.seat_state.get_touch(qh, &seat).ok();
+        }
         if capability == Capability::Pointer && self.pointer.is_none() {
-            if let Ok(pointer) = self.seat_state.get_pointer(qh, &seat) {
+            let surface = self.compositor.create_surface(qh);
+            if let Ok(themed) = self.seat_state.get_pointer_with_theme(qh, &seat, self.shm.wl_shm(), surface, ThemeSpec::default()) {
+                let pointer = themed.pointer().clone();
                 self.relative_pointer = self
                     .relative_pointer_state
                     .get_relative_pointer(&pointer, qh)
                     .ok();
                 self.pointer = Some(pointer);
+                self.themed_pointer = Some(themed);
             }
         }
     }
@@ -732,23 +761,31 @@ impl SeatHandler for State {
         &mut self,
         _: &Connection,
         _: &QueueHandle<Self>,
-        _: wl_seat::WlSeat,
+        seat: wl_seat::WlSeat,
         capability: Capability,
     ) {
-        if capability == Capability::Pointer {
-            if let Some(pointer) = self.pointer.take() {
-                pointer.release();
-            }
-            self.relative_pointer = None;
+        if capability == Capability::Touch && self.touch.as_ref().and_then(|touch| touch.data::<TouchData>()).is_some_and(|data| data.seat() == &seat) {
+            self.cancel_touch();
+            if let Some(touch) = self.touch.take() { if touch.version() >= 3 { touch.release(); } }
+        }
+        if capability == Capability::Pointer && self.pointer.as_ref().and_then(|pointer| pointer.data::<PointerData>()).is_some_and(|data| data.seat() == &seat) {
+            self.cancel_drag();
+            self.pointer_focused = false;
+            if let Some(relative) = self.relative_pointer.take() { relative.destroy(); }
+            self.pointer = None;
+            self.themed_pointer = None;
         }
     }
-    fn remove_seat(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat) {}
+    fn remove_seat(&mut self, conn: &Connection, qh: &QueueHandle<Self>, seat: wl_seat::WlSeat) {
+        self.remove_capability(conn, qh, seat.clone(), Capability::Touch);
+        self.remove_capability(conn, qh, seat, Capability::Pointer);
+    }
 }
 
 impl PointerHandler for State {
     fn pointer_frame(
         &mut self,
-        _: &Connection,
+        conn: &Connection,
         _: &QueueHandle<Self>,
         _: &wl_pointer::WlPointer,
         events: &[PointerEvent],
@@ -760,11 +797,13 @@ impl PointerHandler for State {
             let (x, y) = event.position;
             match event.kind {
                 PointerEventKind::Enter { .. } => {
+                    self.pointer_focused = true;
+                    if let Some(pointer) = &self.themed_pointer { cursor::apply(pointer, conn, &self.cursor); }
                     self.send_pointer(PointerEventName::Enter, x, y, None, None)
                 }
                 PointerEventKind::Leave { .. } => {
+                    self.pointer_focused = false;
                     self.send_pointer(PointerEventName::Leave, x, y, None, None);
-                    self.drag = None;
                 }
                 PointerEventKind::Motion { time } => {
                     self.send_pointer(PointerEventName::Motion, x, y, None, Some(time))
@@ -783,8 +822,8 @@ impl PointerHandler for State {
                     }
                 }
                 PointerEventKind::Release { time, button, .. } => {
-                    if let Some(drag) = self.drag.take() {
-                        if drag.started {
+                    if self.drag.as_ref().is_some_and(|drag| drag.button == button) {
+                        if self.drag.take().is_some_and(|drag| drag.started) {
                             self.writer.send(&HostEvent::Drag {
                                 phase: protocol::DragPhase::End,
                                 x: self.x,
@@ -824,6 +863,23 @@ impl PointerHandler for State {
             }
         }
     }
+}
+
+impl TouchHandler for State {
+    fn down(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &WlTouch, _: u32,
+        time: u32, surface: wl_surface::WlSurface, id: i32, position: (f64, f64)) {
+        if !self.visible || &surface != self.window.wl_surface() { return; }
+        if let Some(event) = self.touch_input.down(id, position) { self.send_touch(event, Some(time)); }
+    }
+    fn up(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &WlTouch, _: u32, time: u32, id: i32) {
+        if let Some(event) = self.touch_input.up(id) { self.send_touch(event, Some(time)); }
+    }
+    fn motion(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &WlTouch, time: u32, id: i32, position: (f64, f64)) {
+        if let Some(event) = self.touch_input.motion(id, position) { self.send_touch(event, Some(time)); }
+    }
+    fn cancel(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &WlTouch) { self.cancel_touch(); }
+    fn shape(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &WlTouch, _: i32, _: f64, _: f64) {}
+    fn orientation(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &WlTouch, _: i32, _: f64) {}
 }
 
 impl RelativePointerHandler for State {
@@ -892,6 +948,7 @@ delegate_output!(State);
 delegate_shm!(State);
 delegate_seat!(State);
 delegate_pointer!(State);
+delegate_touch!(State);
 delegate_relative_pointer!(State);
 delegate_xdg_shell!(State);
 delegate_xdg_window!(State);

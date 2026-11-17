@@ -15,6 +15,15 @@ import avatarIconUrl from "./assets/toast-avatar.png";
 import actionSoundUrl from "./assets/toast-action.mp3";
 import notifySoundUrl from "./assets/toast-notify.mp3";
 
+const interactive = new URLSearchParams(window.location.search).get("interactive") === "1";
+if (interactive) {
+  document.title = "Cyrene · 提醒中心";
+  document.body.classList.add("toast-interactive");
+  const header = document.createElement("h1"); header.textContent = "提醒中心";
+  const empty = document.createElement("p"); empty.id = "toast-empty"; empty.textContent = "当前没有提醒";
+  document.body.prepend(header, empty);
+  window.addEventListener("keydown", (event) => { if (event.key === "Escape") window.close(); });
+}
 const api = window.toast;
 const stack = document.getElementById("toast-stack");
 
@@ -87,13 +96,18 @@ function buildCard(item: ToastItem): HTMLElement {
     event.stopPropagation();
     api?.dismissed(item.id);
   });
+  close.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault(); event.stopPropagation();
+    api?.dismissed(item.id);
+  });
 
   el.append(icon, body, close);
   el.addEventListener("click", () => {
     api?.clicked(item.id);
   });
   el.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter" && event.key !== " ") return;
+    if (event.target !== el || (event.key !== "Enter" && event.key !== " ")) return;
     event.preventDefault();
     api?.clicked(item.id);
   });
@@ -144,7 +158,7 @@ let lastReportedHeight = 0;
  * scrollHeight 反映内容真实需求，不受裁剪影响。
  */
 function reportHeight(): void {
-  if (!stack) return;
+  if (!stack || interactive) return;
   // Measure the intrinsic content height, not the height clipped by the
   // current window. Otherwise the main process resizes the window to the
   // reported height, which changes scrollHeight again -> resize loop.
@@ -160,6 +174,9 @@ function reportHeight(): void {
 function relayout(): void {
   if (!stack) return;
   const ordered = orderedEntries();
+  if (interactive) {
+    const empty = document.getElementById("toast-empty"); if (empty) empty.hidden = ordered.length > 0;
+  }
   // 按优先级顺序重排 DOM（appendChild 移动既有节点，不重建）
   for (const { el } of ordered) stack.appendChild(el);
   // 超出可见上限时：窗口只撑到前 N 条的总高度，其余滚进容器折叠区
@@ -186,7 +203,7 @@ function push(payload: ToastPushPayload): void {
     const el = buildCard(payload);
     cards.set(payload.id, { item: payload, el, removalTimer: null });
   }
-  if (payload.sound) playSound(payload.tier);
+  if (payload.sound && !interactive) playSound(payload.tier);
   relayout();
 }
 

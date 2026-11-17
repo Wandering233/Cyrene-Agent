@@ -1,3 +1,6 @@
+import { withAccessibleToastWindow } from "../toast/toast-accessibility";
+import { setNotificationsControlHandler, setPetMenuControlHandler } from "../control/control-server";
+import { createPetMenuWindow } from "../pet-overlay/pet-menu-window";
 import { disposeAllShellJobs } from "../orchestrator/tools/builtin-tools/shell-job-manager";
 import { closeConversationDatabases } from "../storage/conversation-database-client";
 /**
@@ -12,7 +15,7 @@ import { app, BrowserWindow, dialog, screen, session } from "electron";
 import http from "node:http";
 import * as fs from "fs";
 import * as path from "path";
-import { autoUpdater } from "electron-updater";
+import { getAppUpdater, confirmCurrentAppImageHealth } from "../updater/transactional-appimage-updater";
 
 import { ensureGpuSandboxAcl } from "../gpu-sandbox-acl";
 import { getExternalContentPaths } from "../external-content-paths";
@@ -22,6 +25,8 @@ import { renderBanner } from "../../shared/banner";
 import { IPC } from "../../shared/ipc-channels";
 import { isDev } from "../env";
 import { withLinuxCursorFallback } from "../linux/cursor-position";
+import { showWindowInactive, disposeInactiveWindowRules } from "../linux/inactive-window";
+import { rememberOutputPosition } from "../pet-overlay/output-position";
 import {
   loadGeneralSettings,
   saveGeneralSettings,
@@ -305,11 +310,14 @@ export function createDefaultApplicationDependencies(): ApplicationDependencies 
     pendingTurnLifecycle.disposeAll();
   });
   const readiness = createStartupReadiness();
+  void readiness.waitFor("ready").then(() => confirmCurrentAppImageHealth())
+    .catch((error) => { if (readiness.getPhase() === "ready") console.warn("[AppImage] health confirmation failed:", error); });
   const activation = createWindowActivationBroker();
   const shutdown = createShutdownCoordinator({ readiness, timeoutMs: SHUTDOWN_TIMEOUT_MS });
   shutdown.register({ id: "shell-completion-dispatch", phase: "quiesce", dispose: disposeShellCompletionDispatch });
   shutdown.register({ id: "shell-jobs", phase: "stopLocalResources", dispose: disposeAllShellJobs });
   shutdown.register({ id: "conversation-database", phase: "closePersistence", dispose: closeConversationDatabases });
+  shutdown.register({ id: "inactive-window-rules", phase: "stopLocalResources", dispose: disposeInactiveWindowRules });
 
   // 注入应用图标路径 getter（窗口工厂统一读取，避免循环依赖）。
   // 必须在 shell 阶段之前注入：聊天窗口壳与托盘在 shell 阶段创建时就会读取，
@@ -364,8 +372,9 @@ export function createDefaultApplicationDependencies(): ApplicationDependencies 
         loadPetWindowSettingsSlice: loadGeneralSettings,
         persistPetWindowPosition: ({ x, y }, output) => {
           const before = loadGeneralSettings();
-          const positions = { ...(before.petWindowPositions ?? {}) };
-          if (output) positions[output] = { x, y };
+          const positions = rememberOutputPosition(
+            before.petWindowPositions, { x, y }, output, screen.getAllDisplays(),
+          );
           saveGeneralSettings({
             petWindowX: x,
             petWindowY: y,
@@ -380,6 +389,16 @@ export function createDefaultApplicationDependencies(): ApplicationDependencies 
         // quit 由组合根注入：窗口系统 IPC 不直接依赖 electron app，且退出仍走受控链路。
         registerWindowSystemIpc({ ipc, windowManager, quit: () => app.quit() });
         registerChatUiIpc({ ipc, live2dWindowLifecycle, windowManager });
+        const petMenu = createPetMenuWindow({ ipc, openSettings: () => windowManager.openSettings("appearance"),
+          hidePet: () => windowManager.hidePetWindow(), quit: () => app.quit() });
+        setPetMenuControlHandler(() => petMenu.open());
+        ipc.handle(IPC.PET_MENU_OPEN, (event: Electron.IpcMainInvokeEvent) => {
+          if (!BrowserWindow.fromWebContents(event.sender)) throw new Error("PET_MENU_UNAUTHORIZED");
+          return petMenu.open();
+        });
+        shutdown.register({ id: "pet-menu", phase: "stopLocalResources", dispose: () => {
+          setPetMenuControlHandler(null); petMenu.dispose();
+        } });
       },
       createTray: (input) => createTray({
         togglePetWindow: input.togglePetWindow,
@@ -500,6 +519,8 @@ export function createDefaultApplicationDependencies(): ApplicationDependencies 
         const initialSettings = loadGeneralSettings();
         const screenshot = initializeScreenshotService({
           initialHotkey: initialSettings.screenshotHotkey ?? "Alt+Shift+S",
+          initialHotkeyEnabled: initialSettings.screenshotHotkeyEnabled !== false,
+          saveShortcutSettings: (settings) => { saveGeneralSettings(settings); },
           getReactChatWindow: () => reactChatWindow,
           capturePetWindow: () => shell.windowManager.capturePetWindow(),
           ipc: shell.ipc,
@@ -782,7 +803,7 @@ export function createDefaultApplicationDependencies(): ApplicationDependencies 
           requestControlledShutdown: (input) => shutdown.requestControlledShutdown(input),
         });
         installUpdateShutdownFallback({
-          updater: autoUpdater as unknown as UpdateLifecycleLike,
+          updater: getAppUpdater() as unknown as UpdateLifecycleLike,
           coordinator: shutdown,
           finalAction: () => services.update.install(),
         });
@@ -843,8 +864,9 @@ export function createDefaultApplicationDependencies(): ApplicationDependencies 
       }),
       wireToastCenter: ({ ipc, windowManager }) => {
         // 提醒中心组合根：窗口控制器 + 生命周期权威服务 + 事件总线订阅
-        const toastWindowController = createToastWindowController({
+        const toastWindowController = withAccessibleToastWindow(createToastWindowController({
           createWindow: createToastWindowShell,
+          showInactiveWindow: showWindowInactive,
           getChatWindow: () => reactChatWindow,
           getDisplayMatching: (bounds) => screen.getDisplayMatching(bounds),
           getCursorScreenPoint: () => withLinuxCursorFallback(() => screen.getCursorScreenPoint()),
@@ -868,7 +890,8 @@ export function createDefaultApplicationDependencies(): ApplicationDependencies 
               return null;
             }
           },
-        });
+        }), isDev);
+        setNotificationsControlHandler(() => toastWindowController.openAccessible());
         const toastService = createToastService({
           bus: toastEvents,
           window: toastWindowController,
@@ -902,6 +925,7 @@ export function createDefaultApplicationDependencies(): ApplicationDependencies 
           id: "toast-center",
           phase: "stopLocalResources",
           dispose: async () => {
+            setNotificationsControlHandler(null);
             toastService.dispose();
             toastWindowController.dispose();
           },

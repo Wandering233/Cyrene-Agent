@@ -1,9 +1,14 @@
 mod alpha;
 mod protocol;
+mod stream;
+mod output_layout;
+mod surface_lifecycle;
+mod cursor;
+mod touch_input;
 
 use std::{
     env,
-    io::{BufRead, BufReader, Read, Write},
+    io::{BufReader, Write},
     os::unix::net::UnixStream,
     path::PathBuf,
     sync::{Arc, Mutex},
@@ -18,7 +23,6 @@ use calloop::{
     channel::{Event as ChannelEvent, Sender, channel},
 };
 use protocol::{Control, DragPhase, FrameHeader, HostEvent, PointerEventName};
-use serde_json::Value;
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState},
     delegate_compositor, delegate_layer, delegate_output, delegate_pointer, delegate_registry,
@@ -29,10 +33,10 @@ use smithay_client_toolkit::{
     seat::{
         Capability, SeatHandler, SeatState,
         pointer::{
-            CursorIcon, PointerEvent, PointerEventKind, PointerHandler, ThemeSpec, ThemedPointer,
+            PointerData, PointerEvent, PointerEventKind, PointerHandler, ThemeSpec, ThemedPointer,
         },
         relative_pointer::{RelativeMotionEvent, RelativePointerHandler, RelativePointerState},
-        touch::TouchHandler,
+        touch::{TouchData, TouchHandler},
     },
     shell::{
         WaylandSurface,
@@ -50,7 +54,7 @@ use tracing::{debug, error, info, warn};
 use wayland_client::protocol::wl_shm::Format;
 use wayland_client::protocol::wl_touch::WlTouch;
 use wayland_client::{
-    Connection, Dispatch, QueueHandle,
+    Connection, Dispatch, Proxy, QueueHandle,
     globals::registry_queue_init,
     protocol::{wl_output, wl_pointer, wl_region, wl_seat, wl_surface},
 };
@@ -60,7 +64,6 @@ const PROTOCOL_VERSION: u32 = 1;
 const DEFAULT_WIDTH: u32 = 400;
 const DEFAULT_HEIGHT: u32 = 500;
 const BUFFER_COUNT: usize = 3;
-const MAX_FRAME_BYTES: usize = 128 * 1024 * 1024;
 const INPUT_ALPHA_THRESHOLD: u8 = 10;
 const INPUT_REGION_CELL: u32 = 4;
 
@@ -98,6 +101,10 @@ enum Inbound {
 }
 
 fn main() -> Result<()> {
+    if env::args().any(|arg| arg == "--version") {
+        println!("cyrene-overlay-host {}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -179,77 +186,18 @@ fn connect_with_retry(path: &PathBuf) -> Result<UnixStream> {
     ))
 }
 
-fn spawn_reader(stream: UnixStream, sender: Sender<Inbound>) {
+fn spawn_reader(socket: UnixStream, sender: Sender<Inbound>) {
     thread::spawn(move || {
-        let mut reader = BufReader::new(stream);
+        let mut reader = BufReader::new(socket);
+        let mut decoder = stream::Decoder::default();
         loop {
-            let mut line = String::new();
-            match reader.read_line(&mut line) {
-                Ok(0) => {
-                    let _ = sender.send(Inbound::Closed);
-                    return;
-                }
-                Ok(_) => {}
-                Err(err) => {
-                    let _ = sender.send(Inbound::ReadError(format!("socket read failed: {err}")));
-                    return;
-                }
-            }
-
-            if line.len() > 1024 * 1024 {
-                let _ = sender.send(Inbound::ReadError("socket line too long".into()));
-                return;
-            }
-
-            let value: Value = match serde_json::from_str(&line) {
-                Ok(value) => value,
-                Err(err) => {
-                    let _ = sender.send(Inbound::ReadError(format!("invalid JSON: {err}")));
-                    return;
-                }
+            let inbound = match decoder.next(&mut reader) {
+                Ok(Some(stream::Message::Control(control))) => Inbound::Control(control),
+                Ok(Some(stream::Message::Frame(header, pixels))) => Inbound::Frame(header, pixels),
+                Ok(None) => { let _ = sender.send(Inbound::Closed); return; },
+                Err(error) => { let _ = sender.send(Inbound::ReadError(error)); return; },
             };
-
-            if value.get("type").and_then(Value::as_str) == Some("frame") {
-                let header: FrameHeader = match serde_json::from_value(value) {
-                    Ok(header) => header,
-                    Err(err) => {
-                        let _ =
-                            sender.send(Inbound::ReadError(format!("invalid frame header: {err}")));
-                        return;
-                    }
-                };
-                let Some(len) = header.byte_len() else {
-                    let _ = sender.send(Inbound::ReadError("invalid frame stride".into()));
-                    return;
-                };
-                if len > MAX_FRAME_BYTES {
-                    let _ =
-                        sender.send(Inbound::ReadError(format!("frame too large: {len} bytes")));
-                    return;
-                }
-                let mut pixels = vec![0u8; len];
-                if let Err(err) = reader.read_exact(&mut pixels) {
-                    let _ = sender.send(Inbound::ReadError(format!("truncated frame: {err}")));
-                    return;
-                }
-                if sender.send(Inbound::Frame(header, pixels)).is_err() {
-                    return;
-                }
-            } else {
-                match serde_json::from_value::<Control>(value) {
-                    Ok(control) => {
-                        if sender.send(Inbound::Control(control)).is_err() {
-                            return;
-                        }
-                    }
-                    Err(err) => {
-                        let _ = sender.send(Inbound::ReadError(format!(
-                            "invalid control message: {err}"
-                        )));
-                        return;
-                    }
-                }
-            }
+            if sender.send(inbound).is_err() { return; }
         }
     });
 }
@@ -296,6 +244,7 @@ fn run(reader_stream: UnixStream, writer: EventWriter, initial_layer: Layer) -> 
     spawn_reader(reader_stream, sender);
 
     let mut state = Overlay {
+        connection: conn.clone(),
         registry_state: RegistryState::new(&globals),
         seat_state: SeatState::new(&globals, &qh),
         output_state: OutputState::new(&globals, &qh),
@@ -325,7 +274,9 @@ fn run(reader_stream: UnixStream, writer: EventWriter, initial_layer: Layer) -> 
         scale: 1,
         pointer: None,
         touch: None,
-        last_touch: (0.0, 0.0),
+        touch_input: touch_input::TouchInput::default(),
+        cursor: "default".into(),
+        pointer_focused: false,
         themed_pointer: None,
         relative_pointer: None,
         drag: None,
@@ -333,6 +284,8 @@ fn run(reader_stream: UnixStream, writer: EventWriter, initial_layer: Layer) -> 
         signal,
         quit: false,
         ready_sent: false,
+        initialized: false,
+        surface_lifecycle: surface_lifecycle::SurfaceLifecycle::default(),
         last_frame_seq: None,
         acked_seq: None,
     };
@@ -384,9 +337,11 @@ struct DragState {
     accum_x: f64,
     accum_y: f64,
     started: bool,
+    pointer_start: (f64, f64),
 }
 
 struct Overlay {
+    connection: Connection,
     registry_state: RegistryState,
     seat_state: SeatState,
     output_state: OutputState,
@@ -416,7 +371,9 @@ struct Overlay {
     scale: i32,
     pointer: Option<wl_pointer::WlPointer>,
     touch: Option<WlTouch>,
-    last_touch: (f64, f64),
+    touch_input: touch_input::TouchInput,
+    cursor: String,
+    pointer_focused: bool,
     themed_pointer: Option<ThemedPointer>,
     relative_pointer: Option<ZwpRelativePointerV1>,
     drag: Option<DragState>,
@@ -424,6 +381,8 @@ struct Overlay {
     signal: LoopSignal,
     quit: bool,
     ready_sent: bool,
+    initialized: bool,
+    surface_lifecycle: surface_lifecycle::SurfaceLifecycle,
     last_frame_seq: Option<u64>,
     acked_seq: Option<u64>,
 }
@@ -478,13 +437,14 @@ impl Overlay {
                     self.buffer_scale = scale.max(1);
                 }
                 self.resize(width, height);
+                self.initialized = true;
+                if let Some(output) = output {
+                    self.switch_output(&output);
+                }
                 self.clamp_position();
                 self.apply_margins();
                 self.layer.commit();
                 self.send_position();
-                if let Some(output) = output {
-                    self.switch_output(&output);
-                }
                 if !self.ready_sent {
                     self.send_ready();
                 }
@@ -506,12 +466,27 @@ impl Overlay {
                 self.send_position();
             }
             Control::Show => {
+                if self.visible { return; }
                 self.visible = true;
                 self.region_valid = false;
+                // Unmapping resets layer-shell state. Reapply it and issue an
+                // empty commit before waiting for a fresh configure.
+                self.layer.set_anchor(Anchor::TOP | Anchor::LEFT);
+                self.layer.set_keyboard_interactivity(KeyboardInteractivity::None);
+                self.layer.set_exclusive_zone(-1);
+                self.layer.set_layer(self.layer_kind);
+                self.layer.set_size(self.width, self.height);
+                self.apply_margins();
+                self.layer.commit();
                 self.draw();
             }
             Control::Hide => {
+                if !self.visible { return; }
+                self.cancel_touch();
+                self.cancel_drag();
+                self.pointer_focused = false;
                 self.visible = false;
+                self.surface_lifecycle.replaced();
                 self.region_valid = false;
                 self.update_input_region();
                 self.layer.wl_surface().attach(None, 0, 0);
@@ -522,6 +497,12 @@ impl Overlay {
                 self.region_valid = false;
                 self.update_input_region();
                 self.layer.commit();
+            }
+            Control::Cursor { cursor } => {
+                self.cursor = cursor;
+                if self.pointer_focused {
+                    if let Some(pointer) = &self.themed_pointer { cursor::apply(pointer, &self.connection, &self.cursor); }
+                }
             }
             Control::Layer { layer } => {
                 let target = match layer.as_str() {
@@ -617,7 +598,7 @@ impl Overlay {
     }
 
     fn draw(&mut self) {
-        if !self.visible {
+        if !self.visible || !self.surface_lifecycle.can_attach() {
             return;
         }
         self.update_input_region();
@@ -773,6 +754,11 @@ impl Overlay {
     }
 
     fn set_output(&mut self, output: wl_output::WlOutput) {
+        self.cancel_touch();
+        self.pointer_focused = false;
+        // An output can disappear during the implicit grab. Release the
+        // renderer's drag state before retiring the old surface.
+        self.cancel_drag();
         let surface = self.compositor.create_surface(&self.qh);
         let layer = self.layer_shell.create_layer_surface(
             &self.qh,
@@ -792,6 +778,7 @@ impl Overlay {
         layer.commit();
 
         self.layer = layer;
+        self.surface_lifecycle.replaced();
         self.output = Some(output.clone());
         if let Some(info) = self.output_state.info(&output) {
             if let Some((w, h)) = info.logical_size {
@@ -800,10 +787,32 @@ impl Overlay {
             self.scale = info.scale_factor.max(1);
         }
         self.region_valid = false;
-        self.latest = None;
         self.clamp_position();
         self.apply_margins();
+        self.layer.commit();
         self.send_position();
+    }
+
+    fn finish_drag(&mut self, drag: &DragState) {
+        let origin = self.output.as_ref().and_then(|output| self.output_state.info(output))
+            .and_then(|info| info.logical_position).unwrap_or((0, 0));
+        let pointer = (origin.0 as f64 + drag.start_x as f64 + drag.pointer_start.0 + drag.accum_x,
+            origin.1 as f64 + drag.start_y as f64 + drag.pointer_start.1 + drag.accum_y);
+        let global = (origin.0 + drag.start_x + drag.accum_x.round() as i32,
+            origin.1 + drag.start_y + drag.accum_y.round() as i32);
+        let outputs: Vec<_> = self.output_state.outputs().filter_map(|output| {
+            let info = self.output_state.info(&output)?;
+            let (x, y) = info.logical_position?; let (width, height) = info.logical_size?;
+            Some(output_layout::OutputRect { output, x, y, width, height })
+        }).collect();
+        if let Some(target) = output_layout::target_output(&outputs, pointer).cloned() {
+            let target_origin = self.output_state.info(&target).and_then(|info| info.logical_position).unwrap_or((0, 0));
+            self.x = global.0 - target_origin.0; self.y = global.1 - target_origin.1;
+            if self.output.as_ref() != Some(&target) { self.set_output(target); }
+        } else {
+            self.x = global.0 - origin.0; self.y = global.1 - origin.1;
+        }
+        self.clamp_position(); self.apply_margins(); self.layer.commit(); self.send_position();
     }
 
     fn send_ready(&mut self) {
@@ -826,9 +835,19 @@ impl Overlay {
     }
 
     fn send_position(&self) {
+        if !self.initialized {
+            return;
+        }
+        let info = self.output.as_ref().and_then(|output| self.output_state.info(output));
+        let origin = info.as_ref().and_then(|info| info.logical_position).unwrap_or((0, 0));
+        let output_scale = info.as_ref().map(|info| info.scale_factor.max(1)).unwrap_or(1);
         self.writer.send(&HostEvent::Position {
             x: self.x,
             y: self.y,
+            output: info.and_then(|info| info.name),
+            output_x: origin.0,
+            output_y: origin.1,
+            scale: output_scale,
         });
     }
 
@@ -849,6 +868,28 @@ impl Overlay {
             delta_x: None,
             delta_y: None,
         });
+    }
+
+    fn send_touch(&self, event: touch_input::TouchEvent, time: Option<u32>) {
+        let (x, y) = event.position;
+        if event.event == PointerEventName::Down {
+            self.send_pointer(PointerEventName::Enter, x, y, None, time);
+            self.send_pointer(PointerEventName::Motion, x, y, None, time);
+        }
+        let button = if event.event == PointerEventName::Motion { None } else { Some(0x110) };
+        self.send_pointer(event.event, x, y, button, time);
+        if event.event == PointerEventName::Up { self.send_pointer(PointerEventName::Leave, x, y, None, time); }
+    }
+
+    fn cancel_touch(&mut self) {
+        if let Some(event) = self.touch_input.cancel() { self.send_touch(event, None); }
+    }
+
+    fn cancel_drag(&mut self) {
+        if let Some(drag) = self.drag.take() {
+            self.send_pointer(PointerEventName::Cancel, drag.pointer_start.0, drag.pointer_start.1, Some(drag.button), None);
+            if drag.started { self.writer.send(&HostEvent::Drag { phase: DragPhase::End, x: self.x, y: self.y }); }
+        }
     }
 
     fn send_axis(&self, x: f64, y: f64, time: u32, delta_x: f64, delta_y: f64) {
@@ -877,10 +918,12 @@ impl CompositorHandler for Overlay {
         &mut self,
         _conn: &Connection,
         _qh: &QueueHandle<Self>,
-        _surface: &wl_surface::WlSurface,
+        surface: &wl_surface::WlSurface,
         new_factor: i32,
     ) {
+        if surface != self.layer.wl_surface() { return; }
         self.scale = new_factor.max(1);
+        self.send_position();
     }
 
     fn transform_changed(
@@ -905,9 +948,11 @@ impl CompositorHandler for Overlay {
         &mut self,
         _conn: &Connection,
         _qh: &QueueHandle<Self>,
-        _surface: &wl_surface::WlSurface,
+        surface: &wl_surface::WlSurface,
         output: &wl_output::WlOutput,
     ) {
+        if surface != self.layer.wl_surface() { return; }
+        if self.output.as_ref().is_some_and(|selected| selected != output) { return; }
         self.output = Some(output.clone());
         if let Some(info) = self.output_state.info(output) {
             if let Some((w, h)) = info.logical_size {
@@ -919,6 +964,7 @@ impl CompositorHandler for Overlay {
                 info.name, info.logical_size
             );
         }
+        self.send_position();
     }
 
     fn surface_leave(
@@ -928,9 +974,8 @@ impl CompositorHandler for Overlay {
         _surface: &wl_surface::WlSurface,
         output: &wl_output::WlOutput,
     ) {
-        if self.output.as_ref() == Some(output) {
-            self.output = None;
-        }
+        // 保留选定输出身份；output_destroyed 负责迁移，leave 可能先于销毁到达。
+        let _ = output;
     }
 }
 
@@ -954,6 +999,10 @@ impl OutputHandler for Overlay {
                 }
                 self.scale = info.scale_factor.max(1);
             }
+            self.clamp_position();
+            self.apply_margins();
+            self.layer.commit();
+            self.send_position();
         }
     }
 
@@ -985,7 +1034,15 @@ impl OutputHandler for Overlay {
 }
 
 impl LayerShellHandler for Overlay {
-    fn closed(&mut self, _conn: &Connection, _qh: &QueueHandle<Self>, _layer: &LayerSurface) {
+    fn closed(&mut self, _conn: &Connection, _qh: &QueueHandle<Self>, layer: &LayerSurface) {
+        if layer.wl_surface() != self.layer.wl_surface() { return; }
+        if let Some(output) = self.output.clone() {
+            let replacement = self.output_state.outputs().find(|candidate| candidate != &output);
+            if let Some(next) = replacement {
+                self.set_output(next);
+                return;
+            }
+        }
         self.stop();
     }
 
@@ -993,10 +1050,12 @@ impl LayerShellHandler for Overlay {
         &mut self,
         _conn: &Connection,
         _qh: &QueueHandle<Self>,
-        _layer: &LayerSurface,
+        layer: &LayerSurface,
         configure: LayerSurfaceConfigure,
         _serial: u32,
     ) {
+        if layer.wl_surface() != self.layer.wl_surface() { return; }
+        self.surface_lifecycle.configured();
         let (w, h) = configure.new_size;
         if w > 0 && h > 0 && (w != self.width || h != self.height) {
             self.resize(w, h);
@@ -1052,19 +1111,27 @@ impl SeatHandler for Overlay {
         &mut self,
         _conn: &Connection,
         _: &QueueHandle<Self>,
-        _seat: wl_seat::WlSeat,
+        seat: wl_seat::WlSeat,
         capability: Capability,
     ) {
-        if capability == Capability::Pointer {
-            if let Some(pointer) = self.pointer.take() {
-                pointer.release();
-            }
+        if capability == Capability::Touch && self.touch.as_ref().and_then(|touch| touch.data::<TouchData>()).is_some_and(|data| data.seat() == &seat) {
+            self.cancel_touch();
+            if let Some(touch) = self.touch.take() { if touch.version() >= 3 { touch.release(); } }
+        }
+        if capability == Capability::Pointer && self.pointer.as_ref().and_then(|pointer| pointer.data::<PointerData>()).is_some_and(|data| data.seat() == &seat) {
+            self.cancel_drag();
+            self.pointer_focused = false;
+            if let Some(relative) = self.relative_pointer.take() { relative.destroy(); }
+            self.pointer = None;
+            // ThemedPointer owns and releases wl_pointer; releasing the clone as well is a protocol error.
             self.themed_pointer = None;
-            self.relative_pointer = None;
         }
     }
 
-    fn remove_seat(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat) {}
+    fn remove_seat(&mut self, conn: &Connection, qh: &QueueHandle<Self>, seat: wl_seat::WlSeat) {
+        self.remove_capability(conn, qh, seat.clone(), Capability::Touch);
+        self.remove_capability(conn, qh, seat, Capability::Pointer);
+    }
 }
 
 impl PointerHandler for Overlay {
@@ -1082,11 +1149,14 @@ impl PointerHandler for Overlay {
             let (x, y) = event.position;
             match event.kind {
                 PointerEventKind::Enter { .. } => {
+                    self.pointer_focused = true;
+                    if let Some(pointer) = &self.themed_pointer { cursor::apply(pointer, _conn, &self.cursor); }
                     self.send_pointer(PointerEventName::Enter, x, y, None, None);
                 }
                 PointerEventKind::Leave { .. } => {
+                    self.pointer_focused = false;
                     self.send_pointer(PointerEventName::Leave, x, y, None, None);
-                    self.drag = None;
+                    // Implicit pointer grab remains active until button release.
                 }
                 PointerEventKind::Motion { time } => {
                     self.send_pointer(PointerEventName::Motion, x, y, None, Some(time));
@@ -1101,21 +1171,20 @@ impl PointerHandler for Overlay {
                             accum_x: 0.0,
                             accum_y: 0.0,
                             started: false,
+                            pointer_start: (x, y),
                         });
                     }
                 }
                 PointerEventKind::Release { time, button, .. } => {
-                    if let Some(drag) = self.drag.take() {
-                        if drag.started && drag.button == button {
-                            self.writer.send(&HostEvent::Drag {
-                                phase: DragPhase::End,
-                                x: self.x,
-                                y: self.y,
-                            });
-                            self.send_position();
+                    self.send_pointer(PointerEventName::Up, x, y, Some(button), Some(time));
+                    if self.drag.as_ref().is_some_and(|drag| drag.button == button) {
+                        if let Some(drag) = self.drag.take() {
+                            if drag.started {
+                                self.finish_drag(&drag);
+                                self.writer.send(&HostEvent::Drag { phase: DragPhase::End, x: self.x, y: self.y });
+                            }
                         }
                     }
-                    self.send_pointer(PointerEventName::Up, x, y, Some(button), Some(time));
                 }
                 PointerEventKind::Axis {
                     time,
@@ -1216,20 +1285,13 @@ impl TouchHandler for Overlay {
         _: u32,
         time: u32,
         surface: wl_surface::WlSurface,
-        _: i32,
+        id: i32,
         position: (f64, f64),
     ) {
-        if &surface != self.layer.wl_surface() {
+        if !self.visible || &surface != self.layer.wl_surface() {
             return;
         }
-        self.last_touch = position;
-        self.send_pointer(
-            PointerEventName::Down,
-            position.0,
-            position.1,
-            Some(0x110),
-            Some(time),
-        );
+        if let Some(event) = self.touch_input.down(id, position) { self.send_touch(event, Some(time)); }
     }
 
     fn up(
@@ -1239,15 +1301,9 @@ impl TouchHandler for Overlay {
         _: &WlTouch,
         _: u32,
         time: u32,
-        _: i32,
+        id: i32,
     ) {
-        self.send_pointer(
-            PointerEventName::Up,
-            self.last_touch.0,
-            self.last_touch.1,
-            Some(0x110),
-            Some(time),
-        );
+        if let Some(event) = self.touch_input.up(id) { self.send_touch(event, Some(time)); }
     }
 
     fn motion(
@@ -1256,20 +1312,13 @@ impl TouchHandler for Overlay {
         _: &QueueHandle<Self>,
         _: &WlTouch,
         time: u32,
-        _: i32,
+        id: i32,
         position: (f64, f64),
     ) {
-        self.last_touch = position;
-        self.send_pointer(
-            PointerEventName::Motion,
-            position.0,
-            position.1,
-            None,
-            Some(time),
-        );
+        if let Some(event) = self.touch_input.motion(id, position) { self.send_touch(event, Some(time)); }
     }
 
-    fn cancel(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &WlTouch) {}
+    fn cancel(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &WlTouch) { self.cancel_touch(); }
     fn shape(
         &mut self,
         _: &Connection,

@@ -187,3 +187,8 @@ body {
     outline-width: 3px;
   }
 }
+
+body.toast-interactive { display: block; background: var(--rb-surface-page); overflow: auto; color: var(--rb-text-primary); }
+.toast-interactive h1 { margin: 18px 24px 8px; font: 600 20px system-ui; }
+.toast-interactive #toast-empty { margin: 24px; }
+.toast-interactive #toast-stack { max-height: none !important; overflow: visible; }

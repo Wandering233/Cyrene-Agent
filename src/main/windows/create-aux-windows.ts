@@ -1,3 +1,4 @@
+import { attachHyprlandWindowPlacement, fitWindowBounds, readWindowBounds } from "../linux/window-placement";
 import { app, BrowserWindow, screen } from "electron";
 import { withLinuxCursorFallback } from "../linux/cursor-position";
 import * as path from "path";
@@ -83,6 +84,7 @@ export function createReactChatWindowShell(): BrowserWindow {
   });
   setReactChatWindow(window);
   attachContextMenu(window);
+  attachHyprlandWindowPlacement(window, "workspace", bounds, rememberWindowState);
 
   if (rememberWindowState) {
     window.once("ready-to-show", () => {
@@ -159,6 +161,8 @@ export function createOnboardingBrowserWindow(): BrowserWindow {
     },
   });
   window.setMenuBarVisibility(false);
+  attachHyprlandWindowPlacement(window, "onboarding", { x: workArea.x + Math.floor((workArea.width - width) / 2),
+    y: workArea.y + Math.floor((workArea.height - height) / 2), width, height }, false);
   return window;
 }
 
@@ -193,16 +197,22 @@ export async function createStickerManagerWindow(): Promise<{ ok: boolean; error
     return { ok: true };
   }
 
-  const parentBounds = reactChatWindow?.getBounds();
-  const display = screen.getPrimaryDisplay();
+  const parentBounds = await readWindowBounds(reactChatWindow);
+  if (stickerManagerWindow && !stickerManagerWindow.isDestroyed()) {
+    stickerManagerWindow.show();
+    stickerManagerWindow.focus();
+    return { ok: true };
+  }
+  const display = parentBounds ? screen.getDisplayMatching(parentBounds) : screen.getPrimaryDisplay();
   const { x: dx, y: dy, width: dw, height: dh } = display.workArea;
   const width = 520;
   const height = 420;
-  const window = new BrowserWindow({
+  const bounds = fitWindowBounds({
     x: parentBounds ? parentBounds.x + Math.max(24, Math.floor((parentBounds.width - width) / 2)) : dx + Math.max(0, Math.floor((dw - width) / 2)),
-    y: parentBounds ? parentBounds.y + 64 : dy + Math.max(0, Math.floor((dh - height) / 2)),
-    width,
-    height,
+    y: parentBounds ? parentBounds.y + 64 : dy + Math.max(0, Math.floor((dh - height) / 2)), width, height,
+  }, [display.workArea]);
+  const window = new BrowserWindow({
+    ...bounds,
     minWidth: 460,
     minHeight: 360,
     title: "表情包管理",
@@ -222,9 +232,20 @@ export async function createStickerManagerWindow(): Promise<{ ok: boolean; error
   });
   setStickerManagerWindow(window);
   attachContextMenu(window);
+  attachHyprlandWindowPlacement(window, "stickers", bounds, loadGeneralSettings().rememberWindowState);
 
   window.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
     console.error("[stickers] did-fail-load", { errorCode, errorDescription, validatedURL });
+  });
+
+  window.once("ready-to-show", () => {
+    if (window.isDestroyed()) return;
+    showWindowWhenStartupReady(window);
+    window.focus();
+    window.moveTop();
+  });
+  window.on("closed", () => {
+    if (stickerManagerWindow === window) setStickerManagerWindow(null);
   });
 
   try {
@@ -241,16 +262,6 @@ export async function createStickerManagerWindow(): Promise<{ ok: boolean; error
     window.close();
     return { ok: false, error: message };
   }
-
-  window.once("ready-to-show", () => {
-    showWindowWhenStartupReady(window);
-    window.focus();
-    window.moveTop();
-  });
-
-  window.on("closed", () => {
-    setStickerManagerWindow(null);
-  });
 
   return { ok: true };
 }
@@ -296,6 +307,8 @@ export function createCallWindow(): void {
   });
   setCallWindowLocal(window);
   attachContextMenu(window);
+  attachHyprlandWindowPlacement(window, "call", { x: display.workArea.x + cx,
+    y: display.workArea.y + cy, width: CALL_W, height: CALL_H }, loadGeneralSettings().rememberWindowState);
 
   if (isDev) {
     window.loadURL("http://localhost:5173/call-react/");

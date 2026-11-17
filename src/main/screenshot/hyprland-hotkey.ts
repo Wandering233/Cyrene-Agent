@@ -2,6 +2,7 @@ import { app } from "electron";
 import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import path from "node:path";
+import { normalizeScreenshotShortcut } from "../../shared/screenshot-shortcut";
 import { resolveControlSocketPath } from "../../shared/control-socket";
 
 export interface HyprlandHotkeyBinding {
@@ -11,20 +12,12 @@ export interface HyprlandHotkeyBinding {
 
 /** Convert an Electron accelerator to Hyprland's bind syntax. */
 export function toHyprlandBind(accelerator: string): string | null {
-  const parts = accelerator.split("+").map((part) => part.trim()).filter(Boolean);
-  if (parts.length < 2) return null;
-  const mods: string[] = [];
-  let key: string | null = null;
-  for (const part of parts) {
-    const lower = part.toLowerCase();
-    if (["alt", "option"].includes(lower)) mods.push("ALT");
-    else if (["shift"].includes(lower)) mods.push("SHIFT");
-    else if (["control", "ctrl", "commandorcontrol", "cmdorctrl"].includes(lower)) mods.push("CTRL");
-    else if (["super", "meta", "command", "cmd"].includes(lower)) mods.push("SUPER");
-    else key = part.length === 1 ? part.toUpperCase() : part;
-  }
-  if (!key || mods.length === 0) return null;
-  return `${mods.join(" + ")} + ${key}`;
+  const normalized = normalizeScreenshotShortcut(accelerator);
+  if (!normalized) return null;
+  const parts = normalized.split("+");
+  const key = parts.pop()!;
+  return [...parts.map((part) => part === "Control" ? "CTRL" : part === "Super" ? "SUPER" : part.toUpperCase()),
+    key === "PrintScreen" ? "Print" : key].join(" + ");
 }
 
 /**
@@ -62,7 +55,9 @@ PY
     const run = options.run ?? ((command, args) => {
       execFileSync(command, args, { stdio: "ignore", timeout: 3000 });
     });
-    const luaCommand = `hl.bind("${binding.replace(/"/g, '\\"')}", hl.dsp.exec_cmd("${scriptPath} ${socketPath}"))`;
+    const shellQuote = (value: string) => "'" + value.replace(/'/g, "'\\''") + "'";
+    const command = `${shellQuote(scriptPath)} ${shellQuote(socketPath)}`;
+    const luaCommand = `hl.bind(${JSON.stringify(binding)}, hl.dsp.exec_cmd(${JSON.stringify(command)}))`;
     run("hyprctl", ["eval", luaCommand]);
     return {
       bind: binding,
@@ -76,4 +71,19 @@ PY
     console.warn("[Screenshot] failed to register Hyprland hotkey:", error);
     return null;
   }
+}
+
+/** Inspect compositor bindings before modifying them; an occupied bind is never overwritten. */
+export function hasHyprlandShortcutConflict(
+  accelerator: string, ownBinding?: string,
+  run: (command: string, args: string[]) => string = (command, args) => execFileSync(command, args, { encoding: "utf8", timeout: 3000 }),
+): boolean {
+  const binding = toHyprlandBind(accelerator);
+  if (!binding) return true;
+  const parts = binding.split(" + ");
+  const key = parts.pop()!.toLowerCase();
+  const mask = parts.reduce((value, part) => value | ({ SHIFT: 1, CTRL: 4, ALT: 8, SUPER: 64 }[part] ?? 0), 0);
+  const binds: Array<{ key?: string; modmask?: number }> = JSON.parse(run("hyprctl", ["-j", "binds"]));
+  const matches = binds.filter((item) => item.key?.toLowerCase() === key && item.modmask === mask);
+  return matches.length > (binding === ownBinding ? 1 : 0);
 }

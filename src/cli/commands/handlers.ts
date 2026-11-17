@@ -43,7 +43,7 @@ Commands:
   about     Print banner plus project metadata
   version   Print version only
   run       Launch the Electron desktop app [dev only]
-  control   Send a local control command (show-chat/show-settings/toggle-pet/screenshot/screenshot-window/toast-test/quit)
+  control   Send a local control command (show-chat/show-settings/toggle-pet/screenshot/screenshot-window/toast-test/show-notifications/show-pet-menu/quit)
   doctor    Diagnose the local Linux/Wayland environment
   init      Initialize a workspace (planned)
   update    Self-update (planned)

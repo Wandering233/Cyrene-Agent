@@ -25,6 +25,8 @@ const mocks = vi.hoisted(() => ({
   },
   saveModelSettings: vi.fn(),
   saveModelProfile: vi.fn(),
+  isWindowMaximized: vi.fn(),
+  toggleWindowMaximized: vi.fn(),
 }));
 
 vi.mock("electron", () => ({
@@ -36,9 +38,10 @@ vi.mock("electron", () => ({
     handle: vi.fn((channel: string, handler: (...args: any[]) => unknown) => {
       mocks.handlers.set(channel, handler);
     }),
-    on: vi.fn(),
+    on: vi.fn((channel: string, handler: (...args: any[]) => unknown) => { mocks.handlers.set(channel, handler); }),
   },
 }));
+vi.mock("../linux/window-display-mode", () => ({isWindowMaximized:mocks.isWindowMaximized,toggleWindowMaximized:mocks.toggleWindowMaximized}));
 
 vi.mock("../settings/model-settings", async () => {
   // 复用 shared 四件套的真实语义拼出④：mock 只替换磁盘读写，不手写解析规则
@@ -90,6 +93,25 @@ describe("chat reasoning IPC", () => {
       windowManager: null,
     });
   }
+
+  it("聊天窗口最大化请求只处理 sender 对应窗口，并等待 compositor 查询", async () => {
+    await register();
+    const { BrowserWindow } = await import("electron");
+    const win = { isDestroyed: () => false };
+    vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(win as never);
+    mocks.toggleWindowMaximized.mockResolvedValue(true);
+    mocks.isWindowMaximized.mockResolvedValue(false);
+    const sender = {};
+    mocks.handlers.get(IPC.CHAT_TOGGLE_MAXIMIZE)!({sender});
+    await Promise.resolve();
+    expect(mocks.toggleWindowMaximized).toHaveBeenCalledWith(win);
+    expect(await mocks.handlers.get(IPC.CHAT_IS_MAXIMIZED)!({sender})).toBe(false);
+    vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(null);
+    mocks.toggleWindowMaximized.mockClear();
+    mocks.handlers.get(IPC.CHAT_TOGGLE_MAXIMIZE)!({sender});
+    expect(mocks.toggleWindowMaximized).not.toHaveBeenCalled();
+    expect(await mocks.handlers.get(IPC.CHAT_IS_MAXIMIZED)!({sender})).toBe(false);
+  });
 
   it("reads reasoning capability from the model profile bound to the current session", async () => {
     mocks.sessions.set("session-openai", { id: "session-openai", modelProfileId: "openai-profile" });

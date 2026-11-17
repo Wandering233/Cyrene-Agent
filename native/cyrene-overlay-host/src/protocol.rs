@@ -36,6 +36,7 @@ pub enum Control {
     Layer {
         layer: String,
     },
+    Cursor { cursor: String },
     Quit,
 }
 
@@ -50,6 +51,7 @@ pub struct FrameHeader {
 
 impl FrameHeader {
     pub fn byte_len(&self) -> Option<usize> {
+        if self.width == 0 || self.height == 0 || self.width > 16384 || self.height > 16384 { return None; }
         let stride = self.stride as usize;
         let height = self.height as usize;
         if stride < self.width as usize * 4 {
@@ -95,6 +97,10 @@ pub enum HostEvent {
     Position {
         x: i32,
         y: i32,
+        output: Option<String>,
+        output_x: i32,
+        output_y: i32,
+        scale: i32,
     },
     Error {
         code: String,
@@ -102,7 +108,7 @@ pub enum HostEvent {
     },
 }
 
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum PointerEventName {
     Enter,
@@ -110,6 +116,7 @@ pub enum PointerEventName {
     Motion,
     Down,
     Up,
+    Cancel,
     Axis,
 }
 

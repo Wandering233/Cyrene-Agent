@@ -1,8 +1,9 @@
-import { app } from "electron";
+import { app, screen } from "electron";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { PetOverlayController, type PetOverlayControllerOptions } from "./controller";
 import { registerPetOverlay } from "./registry";
+import { normalizeOutputLabel } from "./output-position";
 
 export { getPetOverlay } from "./registry";
 
@@ -56,7 +57,21 @@ export function createPetOverlayWindow(options: CreatePetOverlayOptions): PetOve
   // The fullscreen fallback currently renders at 1x buffer scale; keep the
   // frame/coordinate contract simple until per-output buffer scale is added.
   const scale = backend === "fullscreen" ? 1 : (options.scale ?? 1);
-  const controller = new PetOverlayController({ ...options, binaryPath, scale });
+  const controller = new PetOverlayController({ ...options, binaryPath, scale,
+    followOutputScale: backend === "layer" && !process.env.CYRENE_OVERLAY_SCALE });
+  const reconcile = () => controller.reconcileOutputs(screen.getAllDisplays().flatMap((display) => {
+    const name = normalizeOutputLabel(display.label);
+    return name ? [{ name, origin: { x: display.bounds.x, y: display.bounds.y }, scale: display.scaleFactor }] : [];
+  }));
+  reconcile();
+  screen.on("display-added", reconcile);
+  screen.on("display-removed", reconcile);
+  screen.on("display-metrics-changed", reconcile);
+  controller.window.once("closed", () => {
+    screen.off("display-added", reconcile);
+    screen.off("display-removed", reconcile);
+    screen.off("display-metrics-changed", reconcile);
+  });
   registerPetOverlay(controller.window, controller);
   return controller;
 }

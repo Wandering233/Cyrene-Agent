@@ -28,6 +28,16 @@ export interface PetOverlayControllerOptions {
   scale?: number;
   /** Output name (e.g. HDMI-A-1) selected by Electron; empty/undefined = compositor default. */
   output?: string;
+  /** Global logical origin of the selected output; wire positions are output-local. */
+  outputOrigin?: { x: number; y: number };
+  outputPositions?: Record<string, { x: number; y: number }>;
+  followOutputScale?: boolean;
+}
+
+export interface PetOverlayOutput {
+  name: string;
+  origin: { x: number; y: number };
+  scale: number;
 }
 
 interface LatestFrame {
@@ -51,9 +61,15 @@ const HOST_RESTART_DELAYS_MS = [500, 1500, 3000];
 export class PetOverlayController {
   readonly window: BrowserWindow;
   private readonly options: PetOverlayControllerOptions;
-  private readonly renderScale: number;
+  private renderScale: number;
   private x: number;
   private y: number;
+  private output: string | undefined;
+  private outputOrigin: { x: number; y: number };
+  private outputs: PetOverlayOutput[] = [];
+  private outputPositions: Record<string, { x: number; y: number }>;
+  private restoreOutput: string | undefined;
+  private dragging = false;
   private width: number;
   private height: number;
   private zoom: number;
@@ -70,6 +86,8 @@ export class PetOverlayController {
   private disposed = false;
   private latest: LatestFrame | null = null;
   private lastPointerClick: PointerClickState | null = null;
+  private cursor = "default";
+  private pressedButtons = new Set<"left" | "middle" | "right">();
   private frameSeq = 0;
   private framesSent = 0;
   private framesDropped = 0;
@@ -87,6 +105,9 @@ export class PetOverlayController {
     this.height = options.height;
     this.x = options.x;
     this.y = options.y;
+    this.output = options.output;
+    this.outputOrigin = options.outputOrigin ?? { x: 0, y: 0 };
+    this.outputPositions = { ...options.outputPositions };
     this.zoom = options.zoom;
     this.visible = options.showOnReady;
     this.alwaysOnTop = options.alwaysOnTop;
@@ -115,6 +136,11 @@ export class PetOverlayController {
     this.window.setTitle("Cyrene Pet Overlay");
     this.window.webContents.setFrameRate(this.visible ? 60 : 2);
     this.window.webContents.on("paint", (_event, _dirty, image) => this.handlePaint(image));
+    this.window.webContents.on("cursor-changed", (_event, cursor) => {
+      if (this.disposed || this.failed) return;
+      this.cursor = cursor;
+      if (this.hostReady) this.host?.sendControl({ type: "cursor", cursor });
+    });
     this.window.webContents.on("console-message", (_event, _level, message) => {
       console.log("[PetOverlayRenderer]", message);
     });
@@ -147,7 +173,44 @@ export class PetOverlayController {
   }
 
   getOutput(): string | undefined {
-    return this.options.output;
+    return this.output;
+  }
+
+  reconcileOutputs(outputs: PetOverlayOutput[]): void {
+    this.outputs = outputs;
+    if (this.output && !outputs.some((item) => item.name === this.output)) {
+      this.outputPositions[this.output] = { x: this.x - this.outputOrigin.x, y: this.y - this.outputOrigin.y };
+      this.restoreOutput ??= this.output;
+    }
+    const restore = outputs.find((item) => item.name === this.restoreOutput);
+    const position = restore && this.outputPositions[restore.name];
+    if (restore && position && !this.dragging) {
+      this.restoreOutput = undefined;
+      this.output = restore.name;
+      this.outputOrigin = restore.origin;
+      this.x = restore.origin.x + position.x;
+      this.y = restore.origin.y + position.y;
+      this.setRenderScale(restore.scale);
+      if (this.hostReady) this.sendInit();
+    }
+  }
+
+  private setRenderScale(scale: number): void {
+    if (!this.options.followOutputScale) return;
+    // Native Wayland offscreen windows do not reliably shrink after setSize.
+    // Keep the highest required sampling scale for this renderer's lifetime.
+    const next = Math.max(this.renderScale, Math.min(8, Math.ceil(scale)));
+    if (!Number.isFinite(next) || next === this.renderScale) return;
+    this.renderScale = next;
+    this.latest = null;
+    this.window.setSize(this.width * next, this.height * next);
+    if (this.hostReady) this.sendInit();
+  }
+
+  private sendInit(): void {
+    this.host?.sendControl({ type: "init", protocol: PROTOCOL_VERSION,
+      width: this.width, height: this.height, x: this.x - this.outputOrigin.x, y: this.y - this.outputOrigin.y,
+      scale: this.renderScale, output: this.output });
   }
 
   isVisible(): boolean {
@@ -183,7 +246,10 @@ export class PetOverlayController {
     if (this.failed || this.disposed) return;
     this.x = Math.round(x);
     this.y = Math.round(y);
-    if (this.hostReady) this.host?.sendControl({ type: "move", x: this.x, y: this.y });
+    this.restoreOutput = undefined;
+    if (this.hostReady) this.host?.sendControl({
+      type: "move", x: this.x - this.outputOrigin.x, y: this.y - this.outputOrigin.y,
+    });
     this.emitMoved();
   }
 
@@ -216,7 +282,7 @@ export class PetOverlayController {
   setAlwaysOnTop(alwaysOnTop: boolean): void {
     this.alwaysOnTop = alwaysOnTop;
     if (this.hostReady) {
-      this.host?.sendControl({ type: "layer", layer: alwaysOnTop ? "overlay" : "top" });
+      this.host?.sendControl({ type: "layer", layer: alwaysOnTop ? "overlay" : "bottom" });
     }
   }
 
@@ -256,7 +322,7 @@ export class PetOverlayController {
         if (generation === this.hostGeneration) this.handleHostFailure(error);
       },
       onLog: (message) => console.log("[PetOverlayHost]", message),
-    }, this.alwaysOnTop ? [] : ["--layer", "bottom"]);
+    }, ["--layer", this.alwaysOnTop ? "overlay" : "bottom"]);
     this.host = host;
 
     try {
@@ -273,20 +339,12 @@ export class PetOverlayController {
     }
 
     this.hostReady = true;
-    host.sendControl({
-      type: "init",
-      protocol: PROTOCOL_VERSION,
-      width: this.width,
-      height: this.height,
-      x: this.x,
-      y: this.y,
-      scale: this.renderScale,
-      output: this.options.output,
-    });
+    this.sendInit();
     host.sendControl({
       type: "layer",
-      layer: this.alwaysOnTop ? "overlay" : "top",
+      layer: this.alwaysOnTop ? "overlay" : "bottom",
     });
+    host.sendControl({ type: "cursor", cursor: this.cursor });
     host.sendControl({ type: this.visible ? "show" : "hide" });
     this.flushLatestFrame();
     this.emitReady();
@@ -307,6 +365,11 @@ export class PetOverlayController {
   private handleHostFailure(error: Error): void {
     if (this.failed || this.disposed || this.restartScheduled) return;
     this.hostReady = false;
+    this.cancelPointerButtons();
+    if (this.dragging) {
+      this.dragging = false;
+      this.window.webContents.send(IPC.PET_OVERLAY_DRAG, { phase: "end" });
+    }
     const host = this.host;
     this.host = null;
     host?.stop();
@@ -353,6 +416,7 @@ export class PetOverlayController {
   private handlePaint(image: NativeImage): void {
     if (this.failed || this.disposed) return;
     const size = image.getSize();
+    if (size.width !== this.width * this.renderScale || size.height !== this.height * this.renderScale) return;
     const bitmap = image.toBitmap();
     const stride = frameStride(bitmap.length, size.width, size.height);
     if (stride === null) {
@@ -409,7 +473,7 @@ export class PetOverlayController {
         break;
       }
       case "ready":
-        if (event.version && event.version !== OVERLAY_HOST_VERSION) {
+        if (event.version !== OVERLAY_HOST_VERSION) {
           this.fail(new Error(
             `HOST_VERSION_MISMATCH: host ${event.version}, expected ${OVERLAY_HOST_VERSION}`,
           ));
@@ -421,9 +485,6 @@ export class PetOverlayController {
           ));
           return;
         }
-        this.hostReady = true;
-        this.flushLatestFrame();
-        this.emitReady();
         break;
       case "pointer":
         this.forwardPointer(event);
@@ -432,8 +493,20 @@ export class PetOverlayController {
         this.handleDrag(event);
         break;
       case "position":
-        this.x = event.x;
-        this.y = event.y;
+        if (!this.hostReady) break;
+        if (event.output && event.output !== this.output && this.output && !this.dragging
+          && !this.outputs.some((item) => item.name === this.output)) {
+          this.restoreOutput ??= this.output;
+          this.outputPositions[this.output] = { x: this.x - this.outputOrigin.x, y: this.y - this.outputOrigin.y };
+        }
+        if (event.output !== undefined) this.output = event.output ?? undefined;
+        if (Number.isFinite(event.output_x) && Number.isFinite(event.output_y)) {
+          this.outputOrigin = { x: event.output_x!, y: event.output_y! };
+        }
+        this.x = event.x + this.outputOrigin.x;
+        this.y = event.y + this.outputOrigin.y;
+        if (this.output) this.outputPositions[this.output] = { x: event.x, y: event.y };
+        if (event.scale) this.setRenderScale(event.scale);
         this.emitMoved();
         break;
       case "log":
@@ -465,6 +538,8 @@ export class PetOverlayController {
       case "up": {
         const button = pointerButtonName(event.button);
         if (!button) return;
+        if (event.event === "down") this.pressedButtons.add(button);
+        else this.pressedButtons.delete(button);
         const clickCount = event.event === "down"
           ? this.resolveClickCount(button, x, y)
           : this.lastPointerClick?.count ?? 1;
@@ -477,6 +552,9 @@ export class PetOverlayController {
         });
         break;
       }
+      case "cancel":
+        this.cancelPointerButtons(pointerButtonName(event.button) ?? undefined);
+        break;
       case "axis": {
         const deltaX = event.delta_x ?? 0;
         const deltaY = event.delta_y ?? 0;
@@ -494,6 +572,18 @@ export class PetOverlayController {
     }
   }
 
+  private cancelPointerButtons(button?: "left" | "middle" | "right"): void {
+    if (this.window.isDestroyed()) { this.pressedButtons.clear(); return; }
+    for (const pressed of this.pressedButtons) {
+      if (button && pressed !== button) continue;
+      // Release outside the page so wl_touch.cancel does not click the pressed menu item.
+      this.window.webContents.sendInputEvent({ type: "mouseUp", x: -1, y: -1, button: pressed, clickCount: 1 });
+      this.pressedButtons.delete(pressed);
+    }
+    this.window.webContents.sendInputEvent({ type: "mouseLeave", x: -1, y: -1 });
+    this.lastPointerClick = null;
+  }
+
   private resolveClickCount(
     button: "left" | "middle" | "right",
     x: number,
@@ -506,15 +596,18 @@ export class PetOverlayController {
 
   private handleDrag(event: DragEvent): void {
     if (event.phase === "start") {
+      this.dragging = true;
+      this.restoreOutput = undefined;
       this.window.webContents.send(IPC.PET_OVERLAY_DRAG, { phase: "start" });
     } else if (event.phase === "end") {
-      this.x = event.x;
-      this.y = event.y;
+      this.dragging = false;
+      this.x = event.x + this.outputOrigin.x;
+      this.y = event.y + this.outputOrigin.y;
       this.window.webContents.send(IPC.PET_OVERLAY_DRAG, { phase: "end" });
       this.emitMoved();
     } else {
-      this.x = event.x;
-      this.y = event.y;
+      this.x = event.x + this.outputOrigin.x;
+      this.y = event.y + this.outputOrigin.y;
     }
   }
 

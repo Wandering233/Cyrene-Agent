@@ -31,6 +31,7 @@ import {
 import { activeConversationRegistry } from "./active-conversation-registry";
 import { flushSummaryMemory } from "../memory/summary-memory-scheduler";
 import { createGeneratedImageStore } from "./generated-image-store";
+import { isWindowMaximized, toggleWindowMaximized } from "../linux/window-display-mode";
 
 export interface ChatUiIpcDependencies {
   live2dWindowLifecycle: { getDiagnostics(): unknown };
@@ -74,15 +75,12 @@ export function registerChatUiIpc(deps: ChatUiIpcDependencies): void {
   ipc.on(IPC.CHAT_TOGGLE_MAXIMIZE, (event) => {
     const senderWindow = BrowserWindow.fromWebContents(event.sender);
     if (!senderWindow) return;
-    if (senderWindow.isMaximized()) {
-      senderWindow.unmaximize();
-    } else {
-      senderWindow.maximize();
-    }
+    void toggleWindowMaximized(senderWindow).catch((error) => console.warn("[Window] maximize failed:", error));
   });
 
   ipc.handle(IPC.CHAT_IS_MAXIMIZED, (event) => {
-    return BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false;
+    const window = BrowserWindow.fromWebContents(event.sender);
+    return window ? isWindowMaximized(window).catch(() => false) : false;
   });
 
   ipc.handle(IPC.CHAT_GET_REASONING_STATE, async (_event, payload?: { sessionId?: unknown; modelProfileId?: unknown }) => {

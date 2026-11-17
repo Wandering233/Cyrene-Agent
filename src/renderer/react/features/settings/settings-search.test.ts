@@ -23,6 +23,12 @@ describe("设置搜索", () => {
       const t = translate(resource);
       expect(searchSettings(t(key), t).some((item) => item.id === key)).toBe(true);
     }
+    for (const resource of [zh, en, ja]) {
+      const t = translate(resource);
+      expect(searchSettings(t("settingsPage.screenshotHotkey"), t).some(
+        (item) => item.id === "settingsPage.screenshotHotkey" && item.section === "appearance",
+      )).toBe(true);
+    }
     expect(searchSettings("FONT SIZE", translate(en)).some((item) => item.id === key)).toBe(true);
     const voice = searchSettings("", translate(zh), "voice");
     expect(voice.length).toBeGreaterThan(2);

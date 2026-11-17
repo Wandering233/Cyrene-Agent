@@ -126,7 +126,7 @@ export function createToastOverlayController(
         hostReady = false;
       },
       onLog: (message) => console.log("[ToastOverlayHost]", message),
-    });
+    }, ["--layer", "overlay"]);
     host = client;
     void client.start().then(() => {
       if (disposed || host !== client) return;
@@ -185,9 +185,6 @@ export function createToastOverlayController(
         });
       }
     }
-    if (event.type === "ready") {
-      hostReady = true;
-    }
   };
 
   const applyBounds = (): void => {
@@ -219,7 +216,7 @@ export function createToastOverlayController(
       ensureWindow();
       startHost();
       if (!hasToasts) {
-        host?.sendControl({ type: "hide" });
+        if (hostReady) host?.sendControl({ type: "hide" });
         return;
       }
       applyBounds();

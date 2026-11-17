@@ -763,6 +763,7 @@
     "switchSessionModelTitle": "切换本对话使用的模型"
   },
   "appUpdate": {
+    "preparingInstall": "正在校验更新并保留当前版本…",
     "idle": "可检查新版本",
     "checking": "正在检查更新…",
     "availableWithVersion": "发现新版本 v{{version}}",
@@ -778,6 +779,7 @@
       "unsupported": "当前安装方式不支持应用内更新，请通过安装包/包管理器更新。",
       "check_failed": "暂时无法检查更新，请稍后再试",
       "download_failed": "更新下载失败，请稍后再试",
+      "install_failed": "更新安装准备失败，当前版本已保留，请重试",
       "default": "更新服务出错，请稍后再试"
     }
   },
@@ -1596,7 +1598,12 @@
     "petZoom": "桌面伙伴大小",
     "petZoomDescription": "调整桌面伙伴的显示比例。",
     "screenshotHotkey": "截图快捷键",
-    "screenshotHotkeyDescription": "例如 Alt+Shift+S；修改后自动重新注册。",
+    "screenshotHotkeyDescription": "录制或输入组合键，点击应用；占用或拒绝授权时保留原设置。",
+    "shortcutRecording": "请按下组合键，Esc 取消",
+    "shortcutRecord": "录制按键",
+    "shortcutApply": "应用",
+    "shortcutEnabled": "启用截图快捷键",
+    "shortcutErrors": {"invalid": "请使用一个修饰键和一个按键，例如 Alt+Shift+S。", "conflict": "该组合键已被占用，请选择其他按键。", "denied": "快捷键授权被拒绝或取消，原设置已保留。", "unavailable": "快捷键注册失败，原设置已保留。"},
     "loadFailed": "设置读取失败，部分选项可能无法显示。",
     "autoApply": "设置会自动应用",
     "general": {

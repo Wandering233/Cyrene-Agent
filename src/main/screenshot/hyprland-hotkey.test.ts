@@ -23,3 +23,16 @@ describe("installHyprlandScreenshotHotkey", () => {
     })).toBeNull();
   });
 });
+
+describe("Hyprland 组合键占用", () => {
+  it("匹配大小写/修饰键，允许唯一自身绑定，重复仍判冲突", async () => {
+    const { hasHyprlandShortcutConflict } = await import("./hyprland-hotkey");
+    const run = () => JSON.stringify([{ key: "s", modmask: 9 }]);
+    expect(hasHyprlandShortcutConflict("Alt+Shift+S", undefined, run)).toBe(true);
+    expect(hasHyprlandShortcutConflict("Alt+Shift+S", "ALT + SHIFT + S", run)).toBe(false);
+    expect(hasHyprlandShortcutConflict("Control+Shift+S", undefined, run)).toBe(false);
+    expect(hasHyprlandShortcutConflict("Alt+Shift+S", "ALT + SHIFT + S", () => JSON.stringify([
+      { key: "S", modmask: 9 }, { key: "s", modmask: 9 },
+    ]))).toBe(true);
+  });
+});

@@ -23,6 +23,7 @@ export interface ToastBounds {
 export interface ToastWindowDeps {
   /** 窗口工厂（由 windows/create-toast-window 提供，toast 模块不直接 new BrowserWindow） */
   createWindow(): BrowserWindow;
+  showInactiveWindow?(window: BrowserWindow, shouldShow: () => boolean): void | Promise<void>;
   /** 聊天窗口引用：存在时 toast 跟随其所在显示器 */
   getChatWindow(): BrowserWindow | null;
   /** 按窗口区域匹配显示器（electron screen.getDisplayMatching 的注入形式；无交集时内部回退主屏） */
@@ -53,6 +54,9 @@ export function createToastWindowController(deps: ToastWindowDeps) {
   let lastChatBounds: ToastBounds | null = null;
   /** 渲染页最近上报的内容高度（高度协议） */
   let contentHeight = 0;
+  let wantedVisible = false;
+  let disposed = false;
+  let showing = false;
 
   function ensureWindow(): BrowserWindow {
     if (!window || window.isDestroyed()) {
@@ -119,12 +123,23 @@ export function createToastWindowController(deps: ToastWindowDeps) {
 
     /** 当前是否有 toast 决定整窗显隐；显示前重算位置（屏幕/高度可能已变化） */
     syncVisibility(hasToasts: boolean): void {
+      if (disposed) return;
+      wantedVisible = hasToasts;
       if (hasToasts) {
         const win = ensureWindow();
         applyBounds();
         if (!win.isVisible()) {
           // showInactive：绝不抢焦点，避免打断用户正在输入
-          win.showInactive();
+          if (deps.showInactiveWindow) {
+            if (showing) return;
+            showing = true;
+            void (async () => deps.showInactiveWindow!(win, () => wantedVisible && !disposed && window === win))()
+              .catch((error) => console.warn("[Toast] inactive window failed to show:", error))
+              .finally(() => {
+                showing = false;
+                if ((!wantedVisible || disposed) && !win.isDestroyed() && win.isVisible()) win.hide();
+              });
+          } else win.showInactive();
         }
       } else if (window && !window.isDestroyed() && window.isVisible()) {
         window.hide();
@@ -144,6 +159,7 @@ export function createToastWindowController(deps: ToastWindowDeps) {
 
     /** 预创建窗口并隐藏加载页面（启动期调用，首次弹出零延迟） */
     preload(): void {
+      if (disposed) return;
       ensureWindow();
     },
 
@@ -159,6 +175,8 @@ export function createToastWindowController(deps: ToastWindowDeps) {
     },
 
     dispose(): void {
+      disposed = true;
+      wantedVisible = false;
       if (window && !window.isDestroyed()) {
         window.destroy();
       }

@@ -116,4 +116,16 @@ describe("createAppUpdateService", () => {
 
     expect(service.getState()).toMatchObject({ phase: "error", error: "download_failed" });
   });
+  it("安装准备失败保留应用，成功准备后不再被定时检查改变状态", async () => {
+    const updater=new FakeUpdater();
+    const prepare=vi.fn(async()=>{throw new Error("disk full");});
+    const wrapped=Object.assign(updater,{prepareInstall:prepare,installPreparedUpdate:vi.fn(()=>true)});
+    const service=createAppUpdateService({updater:wrapped,currentVersion:"1.0.0",isPackaged:true});
+    updater.emit("update-downloaded",{version:"1.0.1"});
+    expect(await service.prepareInstall?.()).toBe(false);expect(service.getState().error).toBe("install_failed");
+    expect(wrapped.installPreparedUpdate).not.toHaveBeenCalled();
+    prepare.mockImplementation(async()=>{});updater.emit("update-downloaded",{version:"1.0.1"});
+    expect(await service.prepareInstall?.()).toBe(true);await service.check();
+    expect(updater.checkForUpdates).not.toHaveBeenCalled();expect(service.install()).toBe(true);
+  });
 });

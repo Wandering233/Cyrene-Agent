@@ -55,6 +55,7 @@ const sections: {
       "settingsPage.petAlwaysOnTop",
       "settingsPage.petVisible",
       "settingsPage.petZoom",
+      "settingsPage.screenshotHotkey",
     ],
   },
   {

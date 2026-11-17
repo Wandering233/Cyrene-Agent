@@ -76,6 +76,11 @@ interface SettingsWindowApi {
   listMcpServers: () => Promise<Array<{ id: string; name: string; connected: boolean; toolCount: number; toolIds: string[] }>>;
   listMcpServerConfigs: () => Promise<import("./settings/shared/types").McpServerConfigView[]>;
   saveGeneral: (payload: Record<string, unknown>) => Promise<unknown>;
+  beginScreenshotHotkeyCapture?: () => Promise<boolean>;
+  endScreenshotHotkeyCapture?: () => Promise<boolean>;
+  getScreenshotShortcutStatus?: () => Promise<import("../shared/screenshot-shortcut").ScreenshotShortcutStatus>;
+  configureScreenshotShortcut?: (request: { accelerator: string; enabled: boolean }) =>
+    Promise<import("../shared/screenshot-shortcut").ScreenshotShortcutResult>;
   getPermissionLevel: () => Promise<{ level: string }>;
   setPermissionLevel: (level: string) => Promise<{ ok: boolean; level?: string; error?: string }>;
   openChromeGpu: () => void;

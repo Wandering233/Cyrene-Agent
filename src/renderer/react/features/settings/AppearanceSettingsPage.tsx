@@ -1,3 +1,4 @@
+import { ScreenshotShortcutControl } from "./ScreenshotShortcutControl";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Alert, Button, Spin } from "antd";
 import { ArrowLeft, AudioLines, BarChart3, BookOpen, Bot, Boxes, Brain, FileText, Globe, Headphones, Heart, Mail, Monitor, Palette, Search, Power, Puzzle, Settings2, Smartphone, Sparkles, Type, Wrench } from "lucide-react";
@@ -53,6 +54,7 @@ interface AppearanceValues {
   petVisible: boolean;
   petZoom: number;
   screenshotHotkey: string;
+  screenshotHotkeyEnabled: boolean;
 }
 
 const defaults: AppearanceValues = {
@@ -62,6 +64,7 @@ const defaults: AppearanceValues = {
   petVisible: true,
   petZoom: 1,
   screenshotHotkey: "Alt+Shift+S",
+  screenshotHotkeyEnabled: true,
 };
 
 function objectValue(value: unknown): Record<string, unknown> {
@@ -80,6 +83,7 @@ function readAppearance(value: unknown): AppearanceValues {
     petAlwaysOnTop: typeof input.petAlwaysOnTop === "boolean" ? input.petAlwaysOnTop : defaults.petAlwaysOnTop,
     petVisible: typeof input.petVisible === "boolean" ? input.petVisible : defaults.petVisible,
     petZoom: finiteNumber(input.petZoom, defaults.petZoom),
+    screenshotHotkeyEnabled: input.screenshotHotkeyEnabled !== false,
     screenshotHotkey: typeof input.screenshotHotkey === "string"
       ? input.screenshotHotkey
       : defaults.screenshotHotkey,
@@ -414,13 +418,7 @@ export function AppearanceSettingsPage({ section, onSelectSection, onBackToWorks
                   </div>
                   <div className="cy-settings-row">
                     <div className="cy-settings-row__copy"><strong data-settings-search-id="settingsPage.screenshotHotkey">{t("settingsPage.screenshotHotkey")}</strong><span>{t("settingsPage.screenshotHotkeyDescription")}</span></div>
-                    <input
-                      className="cy-settings-hotkey-input"
-                      aria-label={t("settingsPage.screenshotHotkey")}
-                      value={values.screenshotHotkey}
-                      onChange={(event) => setValues((current) => ({ ...current, screenshotHotkey: event.target.value }))}
-                      onBlur={() => { void savePatch({ screenshotHotkey: values.screenshotHotkey.trim() || defaults.screenshotHotkey }); }}
-                    />
+                    <ScreenshotShortcutControl initialShortcut={values.screenshotHotkey} initialEnabled={values.screenshotHotkeyEnabled} />
                   </div>
                 </Card>
               </section>

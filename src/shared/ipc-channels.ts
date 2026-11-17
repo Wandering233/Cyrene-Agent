@@ -41,6 +41,8 @@ export const IPC = {
   WINDOW_GET_CURSOR_POSITION: "window:get-cursor-position",
   PET_VISIBILITY_CHANGED: "pet:visibility-changed",
   PET_OVERLAY_DRAG: "pet:overlay-drag",
+  PET_MENU_OPEN: "pet:menu-open",
+  PET_MENU_ACTION: "pet:menu-action",
   APP_QUIT: "app:quit",
 
   // GitHub 应用更新
@@ -567,6 +569,8 @@ export const IPC = {
   SCREENSHOT_INSERT: "screenshot:insert",
   SCREENSHOT_HOTKEY_CAPTURE_START: "screenshot:hotkey-capture-start",
   SCREENSHOT_HOTKEY_CAPTURE_END: "screenshot:hotkey-capture-end",
+  SCREENSHOT_SHORTCUT_GET: "screenshot:shortcut-get",
+  SCREENSHOT_SHORTCUT_SET: "screenshot:shortcut-set",
 
   // plugin system
   PLUGINS_LIST: "plugins:list",

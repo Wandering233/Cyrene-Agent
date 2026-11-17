@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import { resolveAppUpdateView } from "./app-update-view";
 
 describe("resolveAppUpdateView", () => {
+  it("安装准备时显示进度并停止提供重复安装动作", () => {
+    expect(resolveAppUpdateView({phase:"preparing_install",currentVersion:"1.3.7",availableVersion:"1.3.8"})).toMatchObject({
+      label:{key:"appUpdate.preparingInstall"},action:null,busy:true,
+    });
+  });
   it("maps every phase to a translatable view", () => {
     // 未检查过：可以发起检查，红点不亮
     expect(resolveAppUpdateView({ phase: "idle", currentVersion: "1.1.7" })).toMatchObject({
